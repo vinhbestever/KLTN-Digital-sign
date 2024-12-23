@@ -13,6 +13,7 @@ const Dashboard = () => {
       <h2>Dashboard</h2>
       <button onClick={handleLogout}>Logout</button>
       <UploadFile />
+
       {/* <VerifyFile /> */}
     </div>
   );
