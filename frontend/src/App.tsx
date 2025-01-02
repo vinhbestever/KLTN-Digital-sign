@@ -8,11 +8,11 @@ import {
 import './App.css';
 import Dashboard from './components/Dashboad';
 import Register from './components/Register';
-import Login from './components/Login';
+import Login from './pages/Login/Login';
 import SignedFiles from './components/SignedFiles';
 import VerifyFile from './components/VerifyFile';
 import Header from './components/Header';
-import Sidebar from './components/SideBar';
+import Sidebar from './components/SideBar/SideBar';
 
 const App = () => {
   const isAuthenticated = !!localStorage.getItem('token');
@@ -43,25 +43,57 @@ const App = () => {
     //       path="/verify-file"
     //       element={isAuthenticated ? <VerifyFile /> : <Navigate to="/login" />}
     //     />
+
     //     <Route path="*" element={<Navigate to="/login" />} />
     //   </Routes>
     // </Router>
     <Router>
       <div className="flex flex-col h-screen">
-        {/* Header */}
-        <Header />
-
         {/* Main Content */}
         <div className="flex flex-1">
           {/* Sidebar */}
-          <Sidebar />
+          {isAuthenticated && <Sidebar />}
 
           {/* Content */}
-          <main className="flex-1 bg-gray-100 p-4">
+          <main
+            className={`${
+              isAuthenticated ? 'ml-[60px] ' : ''
+            }flex-1 bg-gray-100`}
+          >
             <Routes>
-              <Route path="/dashboard" element={<Dashboard />} />
-              {/* <Route path="/settings" element={<Settings />} />
-              <Route path="/profile" element={<Profile />} /> */}
+              <Route
+                path="/login"
+                element={
+                  isAuthenticated ? <Navigate to="/dashboard" /> : <Login />
+                }
+              />
+              <Route
+                path="/register"
+                element={
+                  isAuthenticated ? <Navigate to="/dashboard" /> : <Register />
+                }
+              />
+              <Route
+                path="/dashboard"
+                element={
+                  isAuthenticated ? <Dashboard /> : <Navigate to="/login" />
+                }
+              />
+              <Route
+                path="/signed-files"
+                element={
+                  isAuthenticated ? <SignedFiles /> : <Navigate to="/login" />
+                }
+              />
+
+              <Route
+                path="/verify-file"
+                element={
+                  isAuthenticated ? <VerifyFile /> : <Navigate to="/login" />
+                }
+              />
+
+              <Route path="*" element={<Navigate to="/login" />} />
             </Routes>
           </main>
         </div>

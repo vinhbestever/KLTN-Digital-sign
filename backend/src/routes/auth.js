@@ -1,87 +1,174 @@
 const express = require('express');
 const bcrypt = require('bcrypt');
-const jwt = require('jsonwebtoken');
 const crypto = require('crypto');
-const pool = require('../database');
-
+const nodemailer = require('nodemailer');
+const pool = require('../database'); // PostgreSQL connection
+const jwt = require('jsonwebtoken');
 const router = express.Router();
-const JWT_SECRET = 'your_jwt_secret_key';
 
-// Đăng ký
+require('dotenv').config();
+
+// Gửi email qua NodeMailer
+const transporter = nodemailer.createTransport({
+  service: 'Gmail',
+  auth: {
+    user: process.env.EMAIL_USER,
+    pass: process.env.EMAIL_PASS,
+  },
+});
+
+// API Đăng ký
 router.post('/register', async (req, res) => {
-  const { username, password, email } = req.body;
+  const { email, password } = req.body;
 
   try {
-    if (!username || !password || !email) {
-      return res.status(400).json({ error: 'All fields are required' });
+    // Kiểm tra email đã tồn tại chưa
+    const userCheck = await pool.query('SELECT * FROM users WHERE email = $1', [
+      email,
+    ]);
+    if (userCheck.rows.length > 0) {
+      return res.status(400).json({ error: 'Email already registered' });
     }
 
     // Hash mật khẩu
-    const salt = await bcrypt.genSalt(10);
-    const passwordHash = await bcrypt.hash(password, salt);
+    const passwordHash = await bcrypt.hash(password, 10);
 
-    // Tạo cặp khóa RSA
+    // Tạo mã OTP
+    const otpCode = crypto.randomInt(100000, 999999).toString();
+    const otpExpiration = new Date(Date.now() + 10 * 60 * 1000); // OTP có hiệu lực trong 10 phút
+
+    // Sinh cặp khóa RSA
     const { publicKey, privateKey } = crypto.generateKeyPairSync('rsa', {
-      modulusLength: 2048,
+      modulusLength: 2048, // Độ dài khóa
       publicKeyEncoding: { type: 'spki', format: 'pem' },
       privateKeyEncoding: { type: 'pkcs8', format: 'pem' },
     });
 
-    // Lưu thông tin vào cơ sở dữ liệu
-    const result = await pool.query(
-      'INSERT INTO users (username, password_hash, email, private_key, public_key) VALUES ($1, $2, $3, $4, $5) RETURNING id',
-      [username, passwordHash, email, privateKey, publicKey]
+    // Lưu thông tin người dùng
+    await pool.query(
+      'INSERT INTO users (email, password_hash, otp_code, otp_expiration, public_key, private_key) VALUES ($1, $2, $3, $4, $5, $6)',
+      [email, passwordHash, otpCode, otpExpiration, publicKey, privateKey]
     );
 
-    res.status(201).json({
-      message: 'User registered successfully',
-      userId: result.rows[0].id,
+    // Gửi OTP qua email
+    await transporter.sendMail({
+      from: process.env.EMAIL_USER,
+      to: email,
+      subject: 'Verify Your Email',
+      text: `Your OTP code is: ${otpCode}`,
     });
+
+    res.status(200).json({ message: 'OTP sent to email' });
   } catch (error) {
-    console.error('Error registering user:', error.stack);
-    res.status(500).json({ error: 'Failed to register user' });
+    console.error('Error during registration:', error);
+    res.status(500).json({ error: 'Registration failed' });
   }
 });
 
-// Đăng nhập
-router.post('/login', async (req, res) => {
-  const { username, password } = req.body;
+router.post('/verify-otp', async (req, res) => {
+  const { email, otp } = req.body;
 
   try {
-    if (!username || !password) {
-      return res
-        .status(400)
-        .json({ error: 'Username and password are required' });
-    }
-
     // Tìm người dùng
-    const result = await pool.query('SELECT * FROM users WHERE username = $1', [
-      username,
-    ]);
-    if (result.rows.length === 0) {
-      return res.status(400).json({ error: 'Invalid username or password' });
+    const userResult = await pool.query(
+      'SELECT * FROM users WHERE email = $1',
+      [email]
+    );
+    const user = userResult.rows[0];
+
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
     }
 
-    const user = result.rows[0];
-
-    // Xác minh mật khẩu
-    const isMatch = await bcrypt.compare(password, user.password_hash);
-    if (!isMatch) {
-      return res.status(400).json({ error: 'Invalid username or password' });
+    // Kiểm tra OTP
+    if (user.otp_code !== otp || new Date() > new Date(user.otp_expiration)) {
+      return res.status(400).json({ error: 'Invalid or expired OTP' });
     }
 
-    // Tạo JWT
+    // Cập nhật trạng thái xác minh
+    await pool.query(
+      'UPDATE users SET is_verified = true, otp_code = NULL, otp_expiration = NULL WHERE email = $1',
+      [email]
+    );
+
+    res.status(200).json({ message: 'Email verified successfully' });
+  } catch (error) {
+    console.error('Error verifying OTP:', error);
+    res.status(500).json({ error: 'OTP verification failed' });
+  }
+});
+
+router.post('/login', async (req, res) => {
+  const { email, password } = req.body;
+
+  try {
+    // Tìm người dùng
+    const userResult = await pool.query(
+      'SELECT * FROM users WHERE email = $1',
+      [email]
+    );
+    const user = userResult.rows[0];
+
+    if (!user || !(await bcrypt.compare(password, user.password_hash))) {
+      return res.status(400).json({ error: 'Invalid email or password' });
+    }
+
+    if (!user.is_verified) {
+      return res.status(400).json({ error: 'Email not verified' });
+    }
+
+    // Tạo token
     const token = jwt.sign(
-      { id: user.id, username: user.username },
-      JWT_SECRET,
+      { id: user.id, email: user.email },
+      'your_secret_key',
       { expiresIn: '1h' }
     );
 
-    res.json({ message: 'Login successful', token });
+    res.status(200).json({ message: 'Login successful', token });
   } catch (error) {
-    console.error('Error logging in:', error.stack);
-    res.status(500).json({ error: 'Failed to log in' });
+    console.error('Error during login:', error);
+    res.status(500).json({ error: 'Login failed' });
   }
 });
 
+// API Forgot Password
+router.post('/forgot-password', async (req, res) => {
+  const { email } = req.body;
+
+  try {
+    // Kiểm tra email có tồn tại
+    const userResult = await pool.query(
+      'SELECT * FROM users WHERE email = $1',
+      [email]
+    );
+    if (userResult.rows.length === 0) {
+      return res.status(404).json({ error: 'Email not found' });
+    }
+
+    // Tạo mật khẩu mới ngẫu nhiên
+    const newPassword = crypto.randomBytes(8).toString('hex'); // Mật khẩu 8 ký tự ngẫu nhiên
+    const hashedPassword = await bcrypt.hash(newPassword, 10);
+
+    // Cập nhật mật khẩu mới vào cơ sở dữ liệu
+    await pool.query('UPDATE users SET password_hash = $1 WHERE email = $2', [
+      hashedPassword,
+      email,
+    ]);
+
+    // Gửi mật khẩu mới qua email
+    await transporter.sendMail({
+      from: process.env.EMAIL_USER,
+      to: email,
+      subject: 'Your New Password',
+      text: `Your new password is: ${newPassword}\nPlease change it after logging in.`,
+    });
+
+    res
+      .status(200)
+      .json({ message: 'New password has been sent to your email.' });
+  } catch (error) {
+    console.error('Error in forgot password:', error);
+    res.status(500).json({ error: 'Failed to reset password' });
+  }
+});
 module.exports = router;

@@ -1,7 +1,5 @@
 import React from 'react';
-import SignFileForm from '../components/SignFileForm';
 import VerifyFileForm from '../components/VerifyFileForm';
-import UploadFileForm from '../components/UploadFileForm';
 import PreviewAndSign from '../components/PreviewAndSign';
 
 const HomePage: React.FC = () => {
