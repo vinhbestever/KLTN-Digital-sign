@@ -2,6 +2,7 @@ const express = require('express');
 const cors = require('cors');
 const authRoutes = require('./routes/auth');
 const fileRoutes = require('./routes/files');
+const userRoutes = require('./routes/user');
 const authenticate = require('./middleware/authenticate');
 
 const app = express();
@@ -19,6 +20,7 @@ app.use(express.json());
 // Routes
 app.use('/api/auth', authRoutes); // Đăng nhập và đăng ký
 app.use('/api/files', authenticate, fileRoutes); // Upload, ký, verify (yêu cầu đăng nhập)
+// app.use('/api/user', authenticate, userRoutes); // User
 
 const PORT = 5001;
 app.listen(PORT, () => {

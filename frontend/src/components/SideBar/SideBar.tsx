@@ -1,5 +1,7 @@
-import { Link } from 'react-router-dom';
+// import { Link } from 'react-router-dom';
 import './SideBar.css';
+import { Avatar } from 'antd';
+import { LogoutOutlined, UserOutlined } from '@ant-design/icons';
 const Sidebar = () => {
   const handleLogout = () => {
     localStorage.removeItem('token');
@@ -8,107 +10,44 @@ const Sidebar = () => {
   };
 
   return (
-    // <aside className="bg-gray-200 w-1/4 p-4 h-full">
-    //   <nav>
-    //     <ul className="space-y-2">
-    //       <li>
-    // <Link
-    //   to="/dashboard"
-    //   className="block p-2 rounded hover:bg-gray-300"
-    // >
-    //   Dashboard
-    // </Link>
-    //       </li>
-    //       <li>
-    //         <Link
-    //           to="/signed-files"
-    //           className="block p-2 rounded hover:bg-gray-300"
-    //         >
-    //           Settings
-    //         </Link>
-    //       </li>
-    //       <li>
-    //         <Link
-    //           to="/verify-file"
-    //           className="block p-2 rounded hover:bg-gray-300"
-    //         >
-    //           Profile
-    //         </Link>
-    //       </li>
-    //     </ul>
-    //   </nav>
-    // </aside>
+    <aside>
+      <div className="flex flex-col justify-between h-[100vh]">
+        <div>
+          <div className="py-[20px] flex gap-[12px] items-center cursor-pointer">
+            <Avatar size="large" icon={<UserOutlined />} />
 
-    <div>
-      <div className="area"></div>
-      <nav className="main-menu">
-        <ul>
-          <li>
-            <a href="/dashboard">
-              <i className="fa fa-home fa-2x"></i>
-              <span className="nav-text">Dashboard</span>
-            </a>
-          </li>
-          <li className="has-subnav">
-            <a href="#">
-              <i className="fa fa-globe fa-2x"></i>
-              <span className="nav-text">Global Surveyors</span>
-            </a>
-          </li>
-          <li className="has-subnav">
-            <a href="#">
-              <i className="fa fa-comments fa-2x"></i>
-              <span className="nav-text">Group Hub Forums</span>
-            </a>
-          </li>
-          <li className="has-subnav">
-            <a href="#">
-              <i className="fa fa-camera-retro fa-2x"></i>
-              <span className="nav-text">Survey Photos</span>
-            </a>
-          </li>
-          <li>
-            <a href="#">
-              <i className="fa fa-film fa-2x"></i>
-              <span className="nav-text">Surveying Tutorials</span>
-            </a>
-          </li>
-          <li>
-            <a href="#">
-              <i className="fa fa-book fa-2x"></i>
-              <span className="nav-text">Surveying Jobs</span>
-            </a>
-          </li>
-          <li>
-            <a href="#">
-              <i className="fa fa-cogs fa-2x"></i>
-              <span className="nav-text">Tools & Resources</span>
-            </a>
-          </li>
-          <li>
-            <a href="#">
-              <i className="fa fa-map-marker fa-2x"></i>
-              <span className="nav-text">Member Map</span>
-            </a>
-          </li>
-          <li>
-            <a href="#">
-              <i className="fa fa-info fa-2x"></i>
-              <span className="nav-text">Documentation</span>
-            </a>
-          </li>
-        </ul>
-
-        <ul className="logout">
-          <li>
-            <a onClick={handleLogout}>
-              <i className="fa fa-power-off fa-2x"></i>
-              <span className="nav-text">Logout</span>
-            </a>
-          </li>
-        </ul>
-      </nav>
-    </div>
+            <div className="text-white text-[18px]">Nguyen Vinh</div>
+          </div>
+          <a href="/dashboard">
+            <i className="fa fa-user-o" aria-hidden="true"></i>
+            Dashboard
+          </a>
+          <a href="/sign">
+            <i className="fa fa-laptop" aria-hidden="true"></i>
+            Sign
+          </a>
+          <a href="/members">
+            <i className="fa fa-clone" aria-hidden="true"></i>
+            Members
+          </a>
+          <a href="/verify">
+            <i className="fa fa-star-o" aria-hidden="true"></i>
+            Verify
+          </a>
+          <a href="/history">
+            <i className="fa fa-trash-o" aria-hidden="true"></i>
+            History
+          </a>
+        </div>
+        <div
+          onClick={handleLogout}
+          className="flex gap-[12px] cursor-pointer p-[12px]"
+        >
+          <LogoutOutlined className="-rotate-90" />
+          <div>Logout</div>
+        </div>
+      </div>
+    </aside>
   );
 };
 
