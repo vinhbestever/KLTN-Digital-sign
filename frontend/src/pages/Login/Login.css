@@ -21,7 +21,7 @@
   width: 100%;
   height: 100%;
 }
-label {
+.label-login {
   color: #fff;
   font-size: 2.3em;
   justify-content: center;
@@ -31,7 +31,7 @@ label {
   cursor: pointer;
   transition: 0.5s ease-in-out;
 }
-input {
+.input-login {
   width: 60%;
   height: 10px;
   background: #e0dede;
@@ -43,7 +43,7 @@ input {
   outline: none;
   border-radius: 5px;
 }
-button {
+.button-login {
   width: 60%;
   height: 40px;
   margin: 10px auto;
@@ -60,7 +60,7 @@ button {
   transition: 0.2s ease-in;
   cursor: pointer;
 }
-button:hover {
+.button-login:hover {
   background: #6d44b8;
 }
 .login {

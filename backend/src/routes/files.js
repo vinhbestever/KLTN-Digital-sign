@@ -7,7 +7,13 @@ const { PDFDocument, rgb } = require('pdf-lib');
 const { verifySignature } = require('../utils/verify');
 
 const router = express.Router();
-const upload = multer({ storage: multer.memoryStorage() }); // Lưu file trong bộ nhớ tạm
+// const upload = multer({ storage: multer.memoryStorage() }); // Lưu file trong bộ nhớ tạm
+const upload = multer({
+  dest: 'uploads/', // Thư mục tạm lưu file
+});
+const authenticate = require('../middleware/authenticate');
+const fs = require('fs');
+const path = require('path');
 
 router.post('/sign', upload.single('file'), async (req, res) => {
   const fileBuffer = req.file.buffer;
@@ -171,4 +177,78 @@ router.get('/download-signed/:id', async (req, res) => {
   }
 });
 
+// API Ký nhiều file
+router.post(
+  '/sign-multiple',
+  authenticate,
+  upload.array('files', 10),
+  async (req, res) => {
+    const userId = req.user.id; // Lấy ID user từ token
+    const files = req.files;
+
+    if (!files || files.length === 0) {
+      return res.status(400).json({ error: 'No files uploaded' });
+    }
+
+    try {
+      // Lấy private key của user từ database
+      const userQuery = await pool.query(
+        'SELECT private_key FROM users WHERE id = $1',
+        [userId]
+      );
+      if (userQuery.rows.length === 0) {
+        return res.status(404).json({ error: 'User not found' });
+      }
+      const privateKey = userQuery.rows[0].private_key;
+
+      let signedFiles = [];
+
+      // Lặp qua từng file để ký
+      for (const file of files) {
+        // Đọc file PDF gốc
+        const pdfBytes = fs.readFileSync(file.path);
+        const pdfDoc = await PDFDocument.load(pdfBytes);
+        const pages = pdfDoc.getPages();
+        const firstPage = pages[0];
+
+        // Thêm chữ ký vào PDF
+        firstPage.drawText('Signed by User', { x: 50, y: 50, size: 12 });
+
+        // Lưu PDF sau khi thêm chữ ký
+        const signedPdfBytes = await pdfDoc.save();
+
+        // Ký nội dung PDF bằng private key
+        const sign = crypto.createSign('SHA256');
+        sign.update(signedPdfBytes);
+        sign.end();
+        const signature = sign.sign(privateKey, 'base64');
+
+        // Lưu file đã ký vào database
+        const insertQuery = `
+        INSERT INTO signed_files (user_id, original_filename, signed_file)
+        VALUES ($1, $2, $3)
+        RETURNING id
+      `;
+        const values = [userId, file.originalname, signedPdfBytes];
+        const result = await pool.query(insertQuery, values);
+
+        signedFiles.push({
+          id: result.rows[0].id,
+          filename: file.originalname,
+          signature,
+        });
+
+        // Xóa file tạm
+        fs.unlinkSync(file.path);
+      }
+
+      res
+        .status(201)
+        .json({ message: 'Files signed successfully', signedFiles });
+    } catch (error) {
+      console.error('Error signing files:', error);
+      res.status(500).json({ error: 'Failed to sign files' });
+    }
+  }
+);
 module.exports = router;

@@ -5,6 +5,7 @@ import { LogoutOutlined, UserOutlined } from '@ant-design/icons';
 const Sidebar = () => {
   const handleLogout = () => {
     localStorage.removeItem('token');
+    localStorage.removeItem('refreshToken');
 
     window.location.href = '/login';
   };

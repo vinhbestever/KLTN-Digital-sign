@@ -1,22 +1,45 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
-body {
+/* body {
   font-family: Arial, sans-serif;
   margin: 0;
   padding: 0;
   display: flex;
   justify-content: center;
   align-items: center;
-  min-height: 100vh;
+  min-height: 100%;
+  background-color: #f4f4f4;
+  overflow: hidden;
+  height: 100%;
+  width: 100%;
+} */
+html,
+body,
+#root {
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  padding: 0;
+  font-family: Arial, Helvetica, sans-serif;
+  overflow: hidden;
   background-color: #f4f4f4;
 }
 
 .App {
-  text-align: center;
-  width: 80%;
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
 }
 
+/* .App {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+} */
 h1 {
   margin-bottom: 20px;
 }
@@ -41,19 +64,6 @@ h1 {
   margin-bottom: 10px;
   border: 1px solid #ddd;
   border-radius: 5px;
-}
-
-.button {
-  padding: 10px 20px;
-  border: none;
-  background: #007bff;
-  color: white;
-  border-radius: 5px;
-  cursor: pointer;
-}
-
-.button:hover {
-  background: #0056b3;
 }
 
 .result {
@@ -83,18 +93,6 @@ h1 {
   margin-bottom: 10px;
 }
 
-.sign-file-form .button {
-  background: #007bff;
-  color: white;
-  padding: 10px 20px;
-  border: none;
-  border-radius: 5px;
-  cursor: pointer;
-}
-
-.sign-file-form .button:hover {
-  background: #0056b3;
-}
 .verify-file-form {
   margin: 20px;
   padding: 20px;
@@ -106,19 +104,6 @@ h1 {
 
 .verify-file-form input {
   margin-bottom: 10px;
-}
-
-.verify-file-form .button {
-  background: #007bff;
-  color: white;
-  padding: 10px 20px;
-  border: none;
-  border-radius: 5px;
-  cursor: pointer;
-}
-
-.verify-file-form .button:hover {
-  background: #0056b3;
 }
 
 .result {
@@ -134,4 +119,7 @@ h1 {
 
 .result.invalid {
   color: red;
+}
+.ant-btn {
+  margin: 0px !important;
 }

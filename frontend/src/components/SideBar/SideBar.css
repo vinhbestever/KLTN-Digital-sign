@@ -19,10 +19,10 @@ aside a {
 
 aside a:hover {
   color: #573b8a;
-  background: #fff;
+  background: #f4f4f4;
   outline: none;
   position: relative;
-  background-color: #fff;
+  background-color: #f4f4f4;
   border-top-left-radius: 20px;
   border-bottom-left-radius: 20px;
 }
@@ -40,7 +40,7 @@ aside a:hover::after {
   height: 35px;
   width: 35px;
   border-bottom-right-radius: 18px;
-  box-shadow: 0 20px 0 0 #fff;
+  box-shadow: 0 20px 0 0 #f4f4f4;
 }
 
 aside a:hover::before {
@@ -52,7 +52,7 @@ aside a:hover::before {
   height: 35px;
   width: 35px;
   border-top-right-radius: 18px;
-  box-shadow: 0 -20px 0 0 #fff;
+  box-shadow: 0 -20px 0 0 #f4f4f4;
 }
 
 aside p {

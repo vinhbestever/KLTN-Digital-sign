@@ -18,7 +18,8 @@ const Login = () => {
         password: passwordLogin,
       });
       alert(response.data.message);
-      localStorage.setItem('token', response.data.token);
+      localStorage.setItem('token', response.data.accessToken);
+      localStorage.setItem('refreshToken', response.data.refreshToken);
       window.location.href = '/dashboard'; // Điều hướng đến Home
     } catch {
       alert('Login failed');
@@ -63,26 +64,35 @@ const Login = () => {
   return (
     <div className="wrapper-login w-full h-full flex items-center justify-center">
       <div className="login-main">
-        <input type="checkbox" id="chk" aria-hidden="true" />
+        <input
+          className="input-login"
+          type="checkbox"
+          id="chk"
+          aria-hidden="true"
+        />
 
         <div className="signup">
-          <label htmlFor="chk" aria-hidden="true">
+          <label className="label-login" htmlFor="chk" aria-hidden="true">
             Sign up
           </label>
 
           {isOtpSent ? (
             <>
               <input
+                className="input-login"
                 onChange={(e) => setOtp(e.target.value)}
                 name="otp"
                 placeholder="OTP"
                 required
               />
-              <button onClick={handleVerifyOtp}>Verify OTP</button>
+              <button className="button-login" onClick={handleVerifyOtp}>
+                Verify OTP
+              </button>
             </>
           ) : (
             <>
               <input
+                className="input-login"
                 onChange={(e) => setEmail(e.target.value)}
                 type="email"
                 name="email"
@@ -91,13 +101,16 @@ const Login = () => {
               />
 
               <input
+                className="input-login"
                 onChange={(e) => setPassword(e.target.value)}
                 type="password"
                 name="pswd"
                 placeholder="Password"
                 required
               />
-              <button onClick={handleRegister}>Sign up</button>
+              <button className="button-login" onClick={handleRegister}>
+                Sign up
+              </button>
             </>
           )}
         </div>
@@ -105,10 +118,11 @@ const Login = () => {
         <div className="login">
           {isForgotPassword ? (
             <>
-              <label htmlFor="chk" aria-hidden="true">
+              <label className="label-login" htmlFor="chk" aria-hidden="true">
                 Login
               </label>
               <input
+                className="input-login"
                 onChange={(e) => setEmailLogin(e.target.value)}
                 type="email"
                 name="email"
@@ -116,7 +130,9 @@ const Login = () => {
                 required
               />
 
-              <button onClick={handleForgotPassword}>Send</button>
+              <button className="button-login" onClick={handleForgotPassword}>
+                Send
+              </button>
 
               <div
                 onClick={() => {
@@ -129,10 +145,11 @@ const Login = () => {
             </>
           ) : (
             <>
-              <label htmlFor="chk" aria-hidden="true">
+              <label className="label-login" htmlFor="chk" aria-hidden="true">
                 Login
               </label>
               <input
+                className="input-login"
                 onChange={(e) => setEmailLogin(e.target.value)}
                 type="email"
                 name="email"
@@ -140,13 +157,16 @@ const Login = () => {
                 required
               />
               <input
+                className="input-login"
                 onChange={(e) => setPasswordLogin(e.target.value)}
                 type="password"
                 name="pswd"
                 placeholder="Password"
                 required
               />
-              <button onClick={handleLogin}>Login</button>
+              <button className="button-login" onClick={handleLogin}>
+                Login
+              </button>
 
               <div
                 onClick={() => {

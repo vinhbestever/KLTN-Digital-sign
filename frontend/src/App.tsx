@@ -19,9 +19,9 @@ const App = () => {
 
   return (
     <Router>
-      <div className="flex flex-col h-screen">
+      <div className="flex flex-col h-full overflow-hidden">
         {/* Main Content */}
-        <div className="flex flex-1">
+        <div className="flex flex-1 h-full overflow-hidden">
           {/* Sidebar */}
           {isAuthenticated && <Sidebar />}
 

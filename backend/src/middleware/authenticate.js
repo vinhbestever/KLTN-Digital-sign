@@ -3,26 +3,22 @@ const jwt = require('jsonwebtoken');
 const JWT_SECRET = 'your_jwt_secret_key';
 
 const authenticate = (req, res, next) => {
-  // Lấy token từ header Authorization
   const authHeader = req.headers.authorization;
   if (!authHeader) {
-    return res.status(401).json({ error: 'Access denied. No token provided.' });
+    return res.status(401).json({ error: 'No token provided' });
   }
 
-  const token = authHeader.split(' ')[1]; // Lấy token từ "Bearer <token>"
-  if (!token) {
-    return res
-      .status(401)
-      .json({ error: 'Access denied. Invalid token format.' });
-  }
+  const token = authHeader.split(' ')[1];
 
   try {
-    // Xác thực token
-    const decoded = jwt.verify(token, JWT_SECRET);
-    req.user = decoded; // Lưu thông tin user vào req
-    next(); // Chuyển đến route tiếp theo
+    const decoded = jwt.verify(token, 'access_secret_key');
+    req.user = decoded;
+    next();
   } catch (error) {
-    res.status(400).json({ error: 'Invalid token.' });
+    if (error.name === 'TokenExpiredError') {
+      return res.status(401).json({ error: 'Token expired' });
+    }
+    return res.status(403).json({ error: 'Invalid token' });
   }
 };
 

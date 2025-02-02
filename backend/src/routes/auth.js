@@ -8,6 +8,20 @@ const router = express.Router();
 
 require('dotenv').config();
 
+// Hàm tạo Access Token
+const createAccessToken = (user) => {
+  return jwt.sign({ id: user.id, email: user.email }, 'access_secret_key', {
+    expiresIn: '15m',
+  });
+};
+
+// Hàm tạo Refresh Token
+const createRefreshToken = (user) => {
+  return jwt.sign({ id: user.id, email: user.email }, 'refresh_secret_key', {
+    expiresIn: '7d',
+  });
+};
+
 // Gửi email qua NodeMailer
 const transporter = nodemailer.createTransport({
   service: 'Gmail',
@@ -118,13 +132,12 @@ router.post('/login', async (req, res) => {
     }
 
     // Tạo token
-    const token = jwt.sign(
-      { id: user.id, email: user.email },
-      'your_secret_key',
-      { expiresIn: '1h' }
-    );
+    const accessToken = createAccessToken(user);
+    const refreshToken = createRefreshToken(user);
 
-    res.status(200).json({ message: 'Login successful', token });
+    res
+      .status(200)
+      .json({ message: 'Login successful', accessToken, refreshToken });
   } catch (error) {
     console.error('Error during login:', error);
     res.status(500).json({ error: 'Login failed' });
@@ -169,6 +182,32 @@ router.post('/forgot-password', async (req, res) => {
   } catch (error) {
     console.error('Error in forgot password:', error);
     res.status(500).json({ error: 'Failed to reset password' });
+  }
+});
+
+// API Refresh Token
+router.post('/api/refresh-token', (req, res) => {
+  const { refreshToken } = req.body;
+
+  if (!refreshToken) {
+    return res.status(401).json({ error: 'No refresh token provided' });
+  }
+
+  try {
+    // Xác minh Refresh Token
+    const decoded = jwt.verify(refreshToken, 'refresh_secret_key');
+
+    // Tạo Access Token mới
+    const newAccessToken = jwt.sign(
+      { id: decoded.id, email: decoded.email },
+      'access_secret_key',
+      { expiresIn: '15m' }
+    );
+
+    res.json({ token: newAccessToken });
+  } catch (error) {
+    console.error('Refresh token verification failed:', error.message);
+    res.status(403).json({ error: 'Invalid or expired refresh token' });
   }
 });
 module.exports = router;
