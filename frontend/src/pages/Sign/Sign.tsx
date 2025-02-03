@@ -7,12 +7,7 @@ import { Button, Steps } from 'antd';
 import { useCallback, useEffect, useRef, useState } from 'react';
 
 import WebViewer from '@pdftron/webviewer';
-
-interface UploadedFile {
-  id: number;
-  name: string;
-  file: File;
-}
+import axiosInstance from '../../api/axiosConfig';
 
 export const Sign = () => {
   const [uploadedFiles, setUploadedFiles] = useState(null);
@@ -21,7 +16,7 @@ export const Sign = () => {
 
   const [step, setStep] = useState(1);
   const [instance, setInstance] = useState(null);
-  const [annotationManager, setAnnotationManager] = useState(null);
+  // const [annotationManager, setAnnotationManager] = useState(null);
 
   const filePicker = useRef(null);
 
@@ -95,7 +90,7 @@ export const Sign = () => {
       );
 
       setInstance(instance);
-      setAnnotationManager(annotationManager);
+      // setAnnotationManager(annotationManager);
 
       filePicker.current.onchange = (e) => {
         const file = e.target.files[0];
@@ -104,95 +99,36 @@ export const Sign = () => {
           instance.UI.loadDocument(file);
         }
       };
-      instance.Core.annotationManager.addEventListener(
-        'annotationChanged',
-        (annotations, action, { imported }) => {
-          console.log('annotations', annotations, action, imported);
-        }
-      );
     });
   }, []);
 
-  const addField = (type, point = {}, name = '', value = '', flag = {}) => {
-    const { documentViewer, Annotations } = instance.Core;
-    const annotationManager = documentViewer.getAnnotationManager();
-    const doc = documentViewer.getDocument();
-    const displayMode = documentViewer.getDisplayModeManager().getDisplayMode();
-    const page = displayMode.getSelectedPages(point, point);
-    if (!!point.x && page.first == null) {
-      return; //don't add field to an invalid page location
-    }
-    const page_idx =
-      page.first !== null ? page.first : documentViewer.getCurrentPage();
-    const page_info = doc.getPageInfo(page_idx);
-    const page_point = displayMode.windowToPage(point, page_idx);
-    const zoom = documentViewer.getZoomLevel();
+  const handleSignFiles = async () => {
+    const { documentViewer, annotationManager } = instance.Core;
 
-    const textAnnot = new Annotations.FreeTextAnnotation();
-    textAnnot.PageNumber = page_idx;
-    const rotation = documentViewer.getCompleteRotation(page_idx) * 90;
-    textAnnot.Rotation = rotation;
-    if (rotation === 270 || rotation === 90) {
-      textAnnot.Width = 50.0 / zoom;
-      textAnnot.Height = 250.0 / zoom;
-    } else {
-      textAnnot.Width = 250.0 / zoom;
-      textAnnot.Height = 50.0 / zoom;
-    }
-    textAnnot.X = (page_point.x || page_info.width / 2) - textAnnot.Width / 2;
-    textAnnot.Y = (page_point.y || page_info.height / 2) - textAnnot.Height / 2;
+    annotationManager.exportAnnotations().then((xfdfString) => {
+      documentViewer
+        .getDocument()
+        .getFileData({ xfdfString })
+        .then(async (data) => {
+          const arr = new Uint8Array(data);
+          console.log('uploadedFiles', uploadedFiles, arr);
 
-    textAnnot.setPadding(new Annotations.Rect(0, 0, 0, 0));
-    textAnnot.custom = {
-      type,
-      value,
-      flag,
-      name: `qqqqqq`,
-    };
+          const blob = new Blob([arr], {
+            type: 'application/pdf',
+          });
+          // FormData is used to send blob data through fetch
+          const formData = new FormData();
+          formData.append('file', blob);
 
-    // set the type of annot
-    textAnnot.setContents(textAnnot.custom.name);
-    textAnnot.FontSize = '' + 20.0 / zoom + 'px';
-    textAnnot.FillColor = new Annotations.Color(211, 211, 211, 0.5);
-    textAnnot.TextColor = new Annotations.Color(0, 165, 228);
-    textAnnot.StrokeThickness = 1;
-    textAnnot.StrokeColor = new Annotations.Color(0, 165, 228);
-    textAnnot.TextAlign = 'center';
-
-    textAnnot.Author = annotationManager.getCurrentUser();
-
-    annotationManager.deselectAllAnnotations();
-    annotationManager.addAnnotation(textAnnot, true);
-    annotationManager.redrawAnnotation(textAnnot);
-    annotationManager.selectAnnotation(textAnnot);
-
-    // const createSignHereElement =
-    //   Annotations.SignatureWidgetAnnotation.prototype.createSignHereElement;
-
-    // Annotations.SignatureWidgetAnnotation.prototype.createSignHereElement =
-    //   function () {
-    //     // signHereElement is the default one with dark blue background
-    //     const signHereElement = createSignHereElement.apply(this, arguments);
-
-    //     signHereElement.style.background = 'red';
-    //     signHereElement.X =
-    //       (page_point.x || page_info.width / 2) - textAnnot.Width / 2;
-    //     signHereElement.Y =
-    //       (page_point.y || page_info.height / 2) - textAnnot.Height / 2;
-    //     return signHereElement;
-    //   };
-  };
-
-  const completeSigning = async () => {
-    const xfdf = await annotationManager.exportAnnotations({
-      widgets: false,
-      links: false,
+          // const response = await axiosInstance.post(
+          //   '/api/files/sign',
+          //   formData
+          // );
+          // if (response.data) {
+          //   console.log('response.data', response.data);
+          // }
+        });
     });
-
-    console.log('xfdf', xfdf);
-
-    // await updateDocumentToSign(docId, email, xfdf);
-    // navigate('/');
   };
   return (
     <div className="p-[32px] flex flex-col w-full h-full gap-[18px]">
@@ -280,20 +216,14 @@ export const Sign = () => {
             </Button>
           )}
           {step === 2 && (
-            <div
-              draggable
-              // onDragStart={(e) => dragStart(e)}
-              // onDragEnd={(e) => dragEnd(e, 'TEXT')}
+            <Button
+              // disabled={uploadedFiles === null}
+              onClick={handleSignFiles}
+              className="!w-fit"
+              type="primary"
             >
-              <Button
-                disabled={uploadedFiles === null}
-                onClick={() => completeSigning()}
-                className="!w-fit"
-                type="primary"
-              >
-                Thêm chữ ký
-              </Button>
-            </div>
+              Gửi chữ ký
+            </Button>
           )}
 
           {/* <Button onClick={handleSignFiles} className="!w-fit" type="primary">
