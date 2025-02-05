@@ -58,10 +58,26 @@ router.post('/register', async (req, res) => {
       privateKeyEncoding: { type: 'pkcs8', format: 'pem' },
     });
 
+    const certificate = `
+    -----BEGIN CERTIFICATE-----
+    Owner: ${email}
+    PublicKey: ${publicKey}
+    Issuer: My Digital Signing System
+    -----END CERTIFICATE-----
+  `;
+
     // Lưu thông tin người dùng
     await pool.query(
-      'INSERT INTO users (email, password_hash, otp_code, otp_expiration, public_key, private_key) VALUES ($1, $2, $3, $4, $5, $6)',
-      [email, passwordHash, otpCode, otpExpiration, publicKey, privateKey]
+      'INSERT INTO users (email, password_hash, otp_code, otp_expiration, public_key, private_key, certificate) VALUES ($1, $2, $3, $4, $5, $6, $7)',
+      [
+        email,
+        passwordHash,
+        otpCode,
+        otpExpiration,
+        publicKey,
+        privateKey,
+        certificate,
+      ]
     );
 
     // Gửi OTP qua email

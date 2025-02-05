@@ -3,7 +3,7 @@ import {
   ContainerFilled,
   SignatureFilled,
 } from '@ant-design/icons';
-import { Button, Steps } from 'antd';
+import { Button, message, Steps } from 'antd';
 import { useCallback, useEffect, useRef, useState } from 'react';
 
 import WebViewer from '@pdftron/webviewer';
@@ -11,47 +11,20 @@ import axiosInstance from '../../api/axiosConfig';
 
 export const Sign = () => {
   const [uploadedFiles, setUploadedFiles] = useState(null);
-  // const [signing, setSigning] = useState(false);
-  const [pdfUrl, setPdfUrl] = useState<string>('');
 
   const [step, setStep] = useState(1);
   const [instance, setInstance] = useState(null);
-  // const [annotationManager, setAnnotationManager] = useState(null);
+  const [isSigned, setIsSigned] = useState(false);
 
   const filePicker = useRef(null);
-
-  // const handleSignFiles = async () => {
-  //   setSigning(true);
-
-  //   const formData = new FormData();
-  //   uploadedFiles.forEach((file) => {
-  //     formData.append('files', file.file);
-  //   });
-
-  //   const token = localStorage.getItem('token');
-
-  //   const response = await axiosInstance.post(
-  //     '/api/files/sign-multiple',
-  //     formData,
-  //     {
-  //       headers: {
-  //         'Content-Type': 'multipart/form-data',
-  //         Authorization: `Bearer ${token}`,
-  //       },
-  //     }
-  //   );
-
-  //   if (response.data) {
-  //     setUploadedFiles([]);
-  //   }
-
-  //   setSigning(false);
-  // };
 
   const handleContinue = () => {
     setStep(2);
   };
-
+  const handleBack = () => {
+    setIsSigned(false);
+    setStep(1);
+  };
   const viewer = useRef(null);
 
   // if using a class, equivalent of componentDidMount
@@ -59,28 +32,15 @@ export const Sign = () => {
     WebViewer(
       {
         path: '/webviewer/lib',
-        disabledElements: [
-          'ribbons',
-          'toggleNotesButton',
-          'searchButton',
-          'menuButton',
-          'rubberStampToolGroupButton',
-          'stampToolGroupButton',
-          'fileAttachmentToolGroupButton',
-          'calloutToolGroupButton',
-          'undo',
-          'redo',
-          'eraserToolButton',
-        ],
+        fullAPI: true,
       },
       viewer.current
-    ).then((instance) => {
+    ).then(async (instance) => {
       // const { iframeWindow } = instance.UI;
-      const { documentViewer, annotationManager, Annotations } = instance.Core;
-      const { VerificationOptions, openElements, loadDocument } = instance.UI;
-      // select only the view group
-      // instance.UI.setToolbarGroup('toolbarGroup-Insert');
+      const { documentViewer, annotationManager } = instance.Core;
+      const { openElements } = instance.UI;
 
+      instance.UI.setToolbarGroup('toolbarGroup-Insert');
       documentViewer.addEventListener(
         'documentLoaded',
         () => {
@@ -90,7 +50,6 @@ export const Sign = () => {
       );
 
       setInstance(instance);
-      // setAnnotationManager(annotationManager);
 
       filePicker.current.onchange = (e) => {
         const file = e.target.files[0];
@@ -99,37 +58,125 @@ export const Sign = () => {
           instance.UI.loadDocument(file);
         }
       };
+
+      annotationManager.addEventListener(
+        'annotationChanged',
+        (annotations, action, { imported }) => {
+          console.log('action', action);
+
+          if (action === 'add') {
+            setIsSigned(true);
+          }
+        }
+      );
     });
   }, []);
 
   const handleSignFiles = async () => {
-    const { documentViewer, annotationManager } = instance.Core;
+    if (!isSigned) {
+      message.error('Bạn chưa thực hiện ký file!');
+      return;
+    }
 
-    annotationManager.exportAnnotations().then((xfdfString) => {
-      documentViewer
-        .getDocument()
-        .getFileData({ xfdfString })
-        .then(async (data) => {
-          const arr = new Uint8Array(data);
-          console.log('uploadedFiles', uploadedFiles, arr);
+    const { PDFNet, documentViewer, annotationManager } = instance.Core;
+    await PDFNet.initialize();
 
-          const blob = new Blob([arr], {
-            type: 'application/pdf',
-          });
-          // FormData is used to send blob data through fetch
-          const formData = new FormData();
-          formData.append('file', blob);
+    const doc = await documentViewer.getDocument().getPDFDoc();
 
-          // const response = await axiosInstance.post(
-          //   '/api/files/sign',
-          //   formData
-          // );
-          // if (response.data) {
-          //   console.log('response.data', response.data);
-          // }
-        });
+    const hasSigned = await doc.hasSignatures();
+
+    if (hasSigned) {
+      message.info('File của bạn đã được ký!');
+      return;
+    }
+
+    const xfdf = await annotationManager.exportAnnotations();
+    const fdfDoc = await PDFNet.FDFDoc.createFromXFDF(xfdf);
+    await doc.fdfMerge(fdfDoc);
+    await doc.flattenAnnotations();
+    console.log('xfdf', fdfDoc);
+
+    // Run PDFNet methods with memory management
+
+    await PDFNet.runWithCleanup(async () => {
+      // runWithCleanup will auto unlock when complete
+
+      doc.lock();
+
+      // Add an StdSignatureHandler instance to PDFDoc, making sure to keep track of it using the ID returned.
+
+      const sigHandlerId = await doc.addStdSignatureHandlerFromURL(
+        'certificate.pfx',
+        'key-password'
+      );
+
+      const approvalSigField = await doc.createDigitalSignatureField(
+        'newfield'
+      );
+
+      const approvalSignatureWidget =
+        await PDFNet.SignatureWidget.createWithDigitalSignatureField(
+          doc,
+          await PDFNet.Rect.init(500, 20, 600, 100),
+          approvalSigField
+        );
+
+      // await approvalSigField.setLocation('Viet Nam');
+      // await approvalSigField.setReason('Document certification.');
+      // await approvalSigField.setContactInfo('Thang Long University');
+      // // (OPTIONAL) Add an appearance to the signature field.
+
+      const img = await PDFNet.Image.createFromURL(
+        doc,
+        'https://upload.wikimedia.org/wikipedia/vi/a/ad/LogoTLU.jpg'
+      );
+
+      await approvalSignatureWidget.createSignatureAppearance(img);
+
+      //We will need to get the first page so that we can add an approval signature field to it
+
+      const page1 = await doc.getPage(1);
+
+      page1.annotPushBack(approvalSignatureWidget);
+
+      // Prepare the signature and signature handler for signing.
+
+      await approvalSigField.signOnNextSaveWithCustomHandler(sigHandlerId);
+
+      // The actual approval signing will be done during the save operation.
+
+      const buf = await doc.saveMemoryBuffer(0);
+
+      const blob = new Blob([buf], { type: 'application/pdf' });
+
+      //Save via any mechanism that you like - saveBlob creates a link, then clicks the link
+
+      // saveBlob(blob, 'signed_doc.pdf');
+
+      console.log('success');
+
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'certified.pdf';
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+
+      // instance.UI.loadDocument(blob, { filename: 'signed_doc.pdf' });
     });
   };
+
+  const fetchPfxFile = async () => {
+    try {
+      const response = await axiosInstance.get('/api/files/generate-temp-pfx');
+      return response.data;
+    } catch (error) {
+      console.error('Lỗi khi lấy file PFX:', error);
+      return null;
+    }
+  };
+
   return (
     <div className="p-[32px] flex flex-col w-full h-full gap-[18px]">
       <div className="text-[22px] font-medium">Select file to Sign</div>
@@ -216,14 +263,19 @@ export const Sign = () => {
             </Button>
           )}
           {step === 2 && (
-            <Button
-              // disabled={uploadedFiles === null}
-              onClick={handleSignFiles}
-              className="!w-fit"
-              type="primary"
-            >
-              Gửi chữ ký
-            </Button>
+            <div className="flex items-center justify-center gap-[12px]">
+              <Button onClick={handleBack} className="!w-fit">
+                Quay lại
+              </Button>
+              <Button
+                disabled={!isSigned}
+                onClick={handleSignFiles}
+                className="!w-fit"
+                type="primary"
+              >
+                Gửi chữ ký
+              </Button>
+            </div>
           )}
 
           {/* <Button onClick={handleSignFiles} className="!w-fit" type="primary">

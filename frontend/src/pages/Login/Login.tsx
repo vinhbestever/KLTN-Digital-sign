@@ -20,6 +20,8 @@ const Login = () => {
       alert(response.data.message);
       localStorage.setItem('token', response.data.accessToken);
       localStorage.setItem('refreshToken', response.data.refreshToken);
+
+      await axiosInstance.get('/api/files/generate-temp-pfx');
       window.location.href = '/dashboard'; // Điều hướng đến Home
     } catch {
       alert('Login failed');

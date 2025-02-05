@@ -2,12 +2,17 @@
 import './SideBar.css';
 import { Avatar } from 'antd';
 import { LogoutOutlined, UserOutlined } from '@ant-design/icons';
+import axiosInstance from '../../api/axiosConfig';
 const Sidebar = () => {
-  const handleLogout = () => {
-    localStorage.removeItem('token');
-    localStorage.removeItem('refreshToken');
+  const handleLogout = async () => {
+    const res = await axiosInstance.post('/api/files/delete-temp-files');
 
-    window.location.href = '/login';
+    if (res) {
+      localStorage.removeItem('token');
+      localStorage.removeItem('refreshToken');
+
+      window.location.href = '/login';
+    }
   };
 
   return (
