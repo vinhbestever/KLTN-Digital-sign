@@ -7,86 +7,15 @@ const { PDFDocument, rgb } = require('pdf-lib');
 const { verifySignature } = require('../utils/verify');
 
 const router = express.Router();
-// const upload = multer({ storage: multer.memoryStorage() }); // Lưu file trong bộ nhớ tạm
-const upload = multer({
-  dest: 'uploads/', // Thư mục tạm lưu file
-});
+const upload = multer({ storage: multer.memoryStorage() }); // Lưu file trong bộ nhớ tạm
+// const upload = multer({
+//   dest: 'uploads/', // Thư mục tạm lưu file
+// });
 const authenticate = require('../middleware/authenticate');
 const fs = require('fs');
 const path = require('path');
 const { execSync } = require('child_process');
 const forge = require('node-forge');
-
-router.post('/sign', authenticate, upload.single('file'), async (req, res) => {
-  const userId = req.user.id;
-  const file = req.file;
-
-  if (!file) {
-    return res.status(400).json({ error: 'No file uploaded' });
-  }
-
-  try {
-    // Lấy Private Key của user
-    const userQuery = await pool.query(
-      'SELECT private_key FROM users WHERE id = $1',
-      [userId]
-    );
-    if (userQuery.rows.length === 0) {
-      return res.status(404).json({ error: 'User not found' });
-    }
-    const privateKey = userQuery.rows[0].private_key;
-
-    // Đọc file PDF gốc
-    const pdfBytes = fs.readFileSync(file.path);
-    const pdfDoc = await PDFDocument.load(pdfBytes);
-
-    // Hash file PDF (file data)
-    const fileHash = crypto.createHash('sha256').update(pdfBytes).digest();
-
-    // Ký hash bằng Private Key (RSA)
-    const sign = crypto.createSign('SHA256');
-    sign.update(fileHash);
-    sign.end();
-    const signature = sign.sign(privateKey, 'base64');
-
-    // ✅ Nhúng chữ ký vào PDF dưới dạng file đính kèm (Embedded File)
-    const signatureBytes = Buffer.from(signature, 'utf-8');
-
-    // ✅ Gắn chữ ký vào PDF
-    const pdfCatalog = pdfDoc.catalog;
-    pdfCatalog.set(
-      'EmbeddedFiles',
-      pdfDoc.context.obj({
-        Names: [
-          'signature.txt',
-          pdfDoc.context.obj({
-            Type: 'Filespec',
-            F: 'signature.txt',
-            EF: pdfDoc.context.obj({
-              F: signatureBytes,
-            }),
-          }),
-        ],
-      })
-    );
-
-    // ✅ Lưu file PDF đã ký
-    const signedPdfBytes = await pdfDoc.save();
-
-    // ✅ Gửi file đã ký về frontend
-    res.setHeader(
-      'Content-Disposition',
-      `attachment; filename=signed-${file.originalname}`
-    );
-    res.setHeader('Content-Type', 'application/pdf');
-    res.send(Buffer.from(signedPdfBytes));
-  } catch (error) {
-    console.error('Error signing file:', error);
-    res.status(500).json({ error: 'Failed to sign file' });
-  } finally {
-    fs.unlinkSync(file.path);
-  }
-});
 
 // Route Verify File
 router.post(
@@ -291,4 +220,26 @@ router.post('/delete-temp-files', authenticate, async (req, res) => {
   }
 });
 
+router.post(
+  '/save-signed-file',
+  authenticate,
+  upload.single('file'),
+  async (req, res) => {
+    try {
+      const userId = req.user.id;
+      const { originalname } = req.file;
+      const fileBuffer = req.file.buffer;
+
+      await pool.query(
+        'INSERT INTO signed_files (user_id, file_name, signed_file, signed_at) VALUES ($1, $2, $3, NOW())',
+        [userId, originalname, fileBuffer]
+      );
+
+      res.json({ message: 'File đã ký được lưu thành công vào database!' });
+    } catch (error) {
+      console.error('Lỗi khi lưu file đã ký:', error);
+      res.status(500).json({ error: 'Lưu file thất bại!' });
+    }
+  }
+);
 module.exports = router;

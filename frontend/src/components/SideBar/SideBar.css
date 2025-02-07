@@ -15,9 +15,10 @@ aside a {
   padding-left: 30px;
   text-decoration: none;
   -webkit-tap-highlight-color: transparent;
+  cursor: pointer;
 }
 
-aside a:hover {
+aside a.active {
   color: #573b8a;
   background: #f4f4f4;
   outline: none;
@@ -31,7 +32,7 @@ aside a i {
   margin-right: 5px;
 }
 
-aside a:hover::after {
+aside a.active::after {
   content: '';
   position: absolute;
   background-color: transparent;
@@ -43,7 +44,7 @@ aside a:hover::after {
   box-shadow: 0 20px 0 0 #f4f4f4;
 }
 
-aside a:hover::before {
+aside a.active::before {
   content: '';
   position: absolute;
   background-color: transparent;

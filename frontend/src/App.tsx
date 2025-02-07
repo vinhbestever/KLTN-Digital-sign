@@ -13,6 +13,7 @@ import { Verify } from './pages/Verify/Verify';
 import { Members } from './pages/Members/Members';
 import { History } from './pages/HIstory/History';
 import { Dashboard } from './pages/Dashboard/Dashboard';
+import { Profile } from './pages/Profile/Profile';
 
 const App = () => {
   const isAuthenticated = !!localStorage.getItem('token');
@@ -69,6 +70,13 @@ const App = () => {
                 path="/history"
                 element={
                   isAuthenticated ? <History /> : <Navigate to="/login" />
+                }
+              />
+
+              <Route
+                path="/profile"
+                element={
+                  isAuthenticated ? <Profile /> : <Navigate to="/login" />
                 }
               />
               <Route path="*" element={<Navigate to="/login" />} />

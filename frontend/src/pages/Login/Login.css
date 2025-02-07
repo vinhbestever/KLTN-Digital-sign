@@ -20,6 +20,7 @@
   position: relative;
   width: 100%;
   height: 100%;
+  transition: 0.8s ease-in-out;
 }
 .label-login {
   color: #fff;
@@ -76,11 +77,14 @@
 }
 
 #chk:checked ~ .login {
-  transform: translateY(-500px);
+  transform: translateY(-530px);
 }
 #chk:checked ~ .login label {
   transform: scale(1);
 }
+#chk:checked ~ .signup {
+  transform: translateY(-40px);
+}
 #chk:checked ~ .signup label {
-  transform: scale(0.6);
+  transform: scale(0.5);
 }

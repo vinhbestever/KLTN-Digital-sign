@@ -202,7 +202,7 @@ router.post('/forgot-password', async (req, res) => {
 });
 
 // API Refresh Token
-router.post('/api/refresh-token', (req, res) => {
+router.post('/refresh-token', (req, res) => {
   const { refreshToken } = req.body;
 
   if (!refreshToken) {

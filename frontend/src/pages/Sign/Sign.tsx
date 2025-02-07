@@ -1,4 +1,5 @@
 import {
+  CheckCircleOutlined,
   CloudUploadOutlined,
   ContainerFilled,
   SignatureFilled,
@@ -15,6 +16,7 @@ export const Sign = () => {
   const [step, setStep] = useState(1);
   const [instance, setInstance] = useState(null);
   const [isSigned, setIsSigned] = useState(false);
+  const [blobFile, setBlobFile] = useState();
 
   const filePicker = useRef(null);
 
@@ -151,35 +153,45 @@ export const Sign = () => {
 
       //Save via any mechanism that you like - saveBlob creates a link, then clicks the link
 
-      // saveBlob(blob, 'signed_doc.pdf');
+      console.log('uploadedFiles', uploadedFiles.name);
 
-      console.log('success');
-
-      const url = window.URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = 'certified.pdf';
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-
-      // instance.UI.loadDocument(blob, { filename: 'signed_doc.pdf' });
+      setBlobFile(blob);
+      await saveSignedFile(blob, uploadedFiles.name);
     });
   };
 
-  const fetchPfxFile = async () => {
+  const saveSignedFile = async (blob: Blob, filename: string) => {
     try {
-      const response = await axiosInstance.get('/api/files/generate-temp-pfx');
-      return response.data;
+      const formData = new FormData();
+      formData.append('file', blob, filename);
+
+      console.log('formData', filename, formData, blob);
+
+      const response = await axiosInstance.post(
+        '/api/files/save-signed-file',
+        formData
+      );
+      if (response) {
+        setStep(3);
+      }
     } catch (error) {
-      console.error('Lỗi khi lấy file PFX:', error);
-      return null;
+      console.error('Lỗi khi lưu file đã ký:', error);
     }
   };
 
+  const handleDownloadFile = () => {
+    if (!blobFile) return;
+    const url = window.URL.createObjectURL(blobFile);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = uploadedFiles.name;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+  };
   return (
     <div className="p-[32px] flex flex-col w-full h-full gap-[18px]">
-      <div className="text-[22px] font-medium">Select file to Sign</div>
+      <div className="text-[22px] font-medium">Chọn tài liệu ký</div>
       <div className="w-full h-full bg-white rounded-lg shadow-lg flex flex-col items-center p-[20px] overflow-hidden">
         <div className="w-full flex flex-col items-center justify-between h-full overflow-hidden">
           <div className="w-full h-full flex flex-col items-center gap-[12px] overflow-hidden">
@@ -243,9 +255,48 @@ export const Sign = () => {
                 </div>
               </label>
             )}
+
+            {step === 3 && (
+              <div className="flex flex-col items-center justify-center w-full gap-[22px] pt-[42px]">
+                <div className="flex flex-col items-center justify-center gap-[12px]">
+                  <CheckCircleOutlined
+                    style={{ fontSize: '50px', color: '#573b8a' }}
+                  />
+                  <div className="text-[18px] text-[#573b8a] font-medium">
+                    KÝ SỐ HOÀN TẤT!
+                  </div>
+
+                  <div className="flex flex-col items-center justify-center">
+                    <div className="text-[14px] text-gray-600">
+                      Dữ liệu đã được ký số trên dịch vụ Hệ thống
+                    </div>
+
+                    <div className="text-[14px] text-gray-600">
+                      Tra cứu lịch sử tại{' '}
+                      <a className="text-blue-600" href="/history">
+                        Đây
+                      </a>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="w-[300px] flex flex-col gap-[12px] justify-center items-center">
+                  <Button
+                    onClick={handleDownloadFile}
+                    className="w-full"
+                    type="primary"
+                  >
+                    Tải về tệp đã ký
+                  </Button>
+                  <Button onClick={handleBack} className="w-full">
+                    Ký file mới
+                  </Button>
+                </div>
+              </div>
+            )}
             <div
               className="App"
-              style={{ display: step > 1 ? 'flex' : 'none' }}
+              style={{ display: step === 2 ? 'flex' : 'none' }}
             >
               <div className="webviewer" ref={viewer}></div>
             </div>
@@ -277,10 +328,6 @@ export const Sign = () => {
               </Button>
             </div>
           )}
-
-          {/* <Button onClick={handleSignFiles} className="!w-fit" type="primary">
-              Ký số
-            </Button> */}
         </div>
       </div>
     </div>
