@@ -9,6 +9,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 
 import WebViewer from '@pdftron/webviewer';
 import axiosInstance from '../../api/axiosConfig';
+import { useUser } from '../../context/UserContext';
 
 export const Sign = () => {
   const [uploadedFiles, setUploadedFiles] = useState(null);
@@ -19,6 +20,7 @@ export const Sign = () => {
   const [blobFile, setBlobFile] = useState();
 
   const filePicker = useRef(null);
+  const { user } = useUser();
 
   const handleContinue = () => {
     setStep(2);
@@ -108,7 +110,7 @@ export const Sign = () => {
       // Add an StdSignatureHandler instance to PDFDoc, making sure to keep track of it using the ID returned.
 
       const sigHandlerId = await doc.addStdSignatureHandlerFromURL(
-        'certificate.pfx',
+        `http://localhost:5173/api/auth/get-key/${user?.id}/private_key`,
         'key-password'
       );
 
@@ -239,7 +241,7 @@ export const Sign = () => {
               >
                 <div className="flex flex-col items-center justify-center space-y-2">
                   <CloudUploadOutlined
-                    className="text-purple-500"
+                    className="text-purple-950"
                     style={{ fontSize: '48px' }}
                   />
                   <p className="text-lg font-medium text-gray-600">

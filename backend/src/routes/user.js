@@ -11,7 +11,7 @@ router.get('/user', authenticate, async (req, res) => {
   try {
     const userId = req.user.id;
     const userQuery = await pool.query(
-      'SELECT id, name, avatar, email FROM users WHERE id = $1',
+      'SELECT id, name, avatar, email, phone, address, gender, dob, role FROM users WHERE id = $1',
       [userId]
     );
 
@@ -30,6 +30,11 @@ router.get('/user', authenticate, async (req, res) => {
       name: user.name,
       email: user.email,
       avatar: avatarUrl,
+      phone: user.phone,
+      address: user.address,
+      gender: user.gender,
+      dob: user.dob,
+      role: user.role,
     });
   } catch (error) {
     console.error('Lỗi khi lấy thông tin user:', error);
@@ -40,7 +45,7 @@ router.get('/user', authenticate, async (req, res) => {
 router.put('/user', authenticate, upload.single('avatar'), async (req, res) => {
   try {
     const userId = req.user.id;
-    const { name, password } = req.body;
+    const { name, password, phone, address, gender, dob } = req.body;
     let updatedFields = [];
     let queryValues = [];
 
@@ -49,16 +54,33 @@ router.put('/user', authenticate, upload.single('avatar'), async (req, res) => {
       queryValues.push(name);
     }
 
+    if (phone) {
+      updatedFields.push('phone = $2');
+      queryValues.push(phone);
+    }
+
+    if (address) {
+      updatedFields.push('address = $3');
+      queryValues.push(address);
+    }
+    if (gender) {
+      updatedFields.push('gender = $4');
+      queryValues.push(gender);
+    }
+    if (dob) {
+      updatedFields.push('dob = $5');
+      queryValues.push(dob);
+    }
     if (password) {
       const hashedPassword = await bcrypt.hash(password, 10);
-      updatedFields.push('password = $2');
+      updatedFields.push('password = $6');
       queryValues.push(hashedPassword);
     }
 
-    if (req.file) {
-      updatedFields.push('avatar = $3');
-      queryValues.push(req.file.buffer);
-    }
+    // if (req.file) {
+    //   updatedFields.push('avatar = $3');
+    //   queryValues.push(req.file.buffer);
+    // }
 
     if (updatedFields.length === 0) {
       return res
@@ -66,10 +88,11 @@ router.put('/user', authenticate, upload.single('avatar'), async (req, res) => {
         .json({ error: 'Không có thông tin nào để cập nhật!' });
     }
 
-    queryValues.push(userId);
-    const query = `UPDATE users SET ${updatedFields.join(', ')} WHERE id = $${
-      queryValues.length
-    }`;
+    console.log(updatedFields.join(', '), queryValues, userId);
+
+    const query = `UPDATE users SET ${updatedFields.join(
+      ', '
+    )} WHERE id = ${userId}`;
 
     await pool.query(query, queryValues);
 
@@ -109,6 +132,38 @@ router.get('/avatar/:userId', async (req, res) => {
   } catch (error) {
     console.error('Lỗi khi lấy avatar:', error);
     res.status(500).json({ error: 'Lỗi khi lấy avatar!' });
+  }
+});
+
+router.get('/users', authenticate, async (req, res) => {
+  try {
+    const { page = 1, pageSize = 10, search = '' } = req.query;
+    const offset = (page - 1) * pageSize;
+
+    const usersQuery = `
+      SELECT id, name, email, phone, address, gender, dob, role, avatar
+      FROM users
+      WHERE LOWER(name) LIKE LOWER($1)
+      ORDER BY id ASC
+      LIMIT $2 OFFSET $3
+    `;
+
+    const countQuery = `SELECT COUNT(*) FROM users WHERE LOWER(name) LIKE LOWER($1)`;
+
+    const users = await pool.query(usersQuery, [
+      `%${search}%`,
+      pageSize,
+      offset,
+    ]);
+    const totalUsers = await pool.query(countQuery, [`%${search}%`]);
+
+    res.json({
+      users: users.rows,
+      total: parseInt(totalUsers.rows[0].count, 10),
+    });
+  } catch (error) {
+    console.error('Lỗi khi lấy danh sách user:', error);
+    res.status(500).json({ error: 'Lỗi khi lấy danh sách user!' });
   }
 });
 

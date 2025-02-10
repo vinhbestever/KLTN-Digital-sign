@@ -1,6 +1,7 @@
 aside {
   color: #fff;
   width: 250px;
+  min-width: 250px;
   padding-left: 20px;
   height: 100vh;
   background-image: linear-gradient(30deg, #573b8a, #6d44b8);

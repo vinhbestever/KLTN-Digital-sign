@@ -39,6 +39,13 @@ const Sidebar = () => {
             </div>
           </div>
           <Link
+            to="/profile"
+            className={location.pathname === '/profile' ? 'active' : ''}
+          >
+            <i className="fa fa-user-o" aria-hidden="true"></i>
+            Thông tin cá nhân
+          </Link>
+          <Link
             to="/dashboard"
             className={location.pathname === '/dashboard' ? 'active' : ''}
           >

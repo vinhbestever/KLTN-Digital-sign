@@ -8,11 +8,16 @@ import {
 import axiosInstance from '../api/axiosConfig';
 
 // 🔹 Định nghĩa kiểu dữ liệu user
-interface User {
+export interface User {
   id: number;
   name: string;
   email: string;
   avatar: string;
+  phone: string;
+  address: string;
+  gender: string;
+  dob: string;
+  role: string;
 }
 
 interface UserContextType {

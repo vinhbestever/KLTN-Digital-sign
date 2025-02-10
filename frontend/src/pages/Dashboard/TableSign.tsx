@@ -1,13 +1,4 @@
-import {
-  Button,
-  DatePicker,
-  GetProp,
-  Input,
-  Space,
-  Table,
-  TableProps,
-  Tag,
-} from 'antd';
+import { DatePicker, GetProp, Input, Table, TableProps } from 'antd';
 import { SorterResult } from 'antd/es/table/interface';
 import React, { useEffect, useState } from 'react';
 import qs from 'qs';
@@ -86,7 +77,7 @@ const getRandomuserParams = (params: TableParams) => ({
   page: params.pagination?.current,
   ...params,
 });
-export const Members = () => {
+export const TableSign = () => {
   const [data, setData] = useState<DataType[]>();
   const [loading, setLoading] = useState(false);
   const [tableParams, setTableParams] = useState<TableParams>({
@@ -146,31 +137,19 @@ export const Members = () => {
     }
   };
   return (
-    <div className="p-[32px] flex flex-col w-full h-full gap-[18px]">
-      <div className="text-[22px] font-medium">Quản lý thành viên</div>
-      <div className="w-full h-full bg-white rounded-lg shadow-lg flex flex-col items-center p-[20px] overflow-auto gap-[18px]">
-        <div className="w-full flex items-center gap-[10px]">
-          <div className="text-[16px]">Danh sách thành viên</div>
-        </div>
+    <div className="flex flex-col w-full h-full gap-[18px]">
+      <div className="text-[18px]">Thống kê file ký gần đây</div>
 
-        <div className="flex w-full items-center gap-[12px]">
-          <Search
-            placeholder="Tìm kiếm thành viên"
-            allowClear
-            style={{ width: '100%' }}
-          />
-        </div>
-        <Table<DataType>
-          columns={columns}
-          className={styles.customTable}
-          rowKey={(record) => record.login.uuid}
-          dataSource={data}
-          pagination={tableParams.pagination}
-          loading={loading}
-          onChange={handleTableChange}
-          scroll={{ y: 55 * 8 }}
-        />
-      </div>
+      <Table<DataType>
+        columns={columns}
+        className={styles.customTable}
+        rowKey={(record) => record.login.uuid}
+        dataSource={data}
+        pagination={tableParams.pagination}
+        loading={loading}
+        onChange={handleTableChange}
+        scroll={{ y: 55 * 4 }}
+      />
     </div>
   );
 };

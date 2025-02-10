@@ -13,4 +13,15 @@ export default defineConfig({
       ),
     },
   },
+  server: {
+    port: 5173,
+    proxy: {
+      '/api': {
+        target: 'http://localhost:5001', // Backend chạy ở đây
+        changeOrigin: true,
+        secure: false,
+        rewrite: (path) => path.replace(/^\/api/, '/api'), // Giữ nguyên đường dẫn API
+      },
+    },
+  },
 });

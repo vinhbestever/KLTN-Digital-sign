@@ -1,9 +1,12 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import axiosInstance from '../../api/axiosConfig';
 import './Login.css';
+import { message } from 'antd';
 const Login = () => {
+  const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [passwordConfirm, setPasswordConfirm] = useState('');
   const [otp, setOtp] = useState('');
   const [isOtpSent, setIsOtpSent] = useState(false);
   const [isForgotPassword, setIsForgotPassword] = useState(false);
@@ -12,19 +15,22 @@ const Login = () => {
   const [passwordLogin, setPasswordLogin] = useState('');
 
   const handleLogin = async () => {
+    if (passwordConfirm !== password) {
+      message.error('Mật khẩu đăng ký không trùng nhau!!');
+    }
     try {
       const response = await axiosInstance.post('/api/auth/login', {
         email: emailLogin,
         password: passwordLogin,
       });
-      alert(response.data.message);
+      message.info(response.data.message);
       localStorage.setItem('token', response.data.accessToken);
       localStorage.setItem('refreshToken', response.data.refreshToken);
 
-      await axiosInstance.get('/api/files/generate-temp-pfx');
+      // await axiosInstance.get('/api/files/generate-temp-pfx');
       window.location.href = '/dashboard'; // Điều hướng đến Home
-    } catch {
-      alert('Login failed');
+    } catch (error) {
+      message.error(error.response.data.error);
     }
   };
 
@@ -33,11 +39,12 @@ const Login = () => {
       const response = await axiosInstance.post('/api/auth/register', {
         email,
         password,
+        name,
       });
-      alert(response.data.message);
+      message.info(response.data.message);
       setIsOtpSent(true);
-    } catch {
-      alert('Registration failed');
+    } catch (error) {
+      message.error(error.response.data.error);
     }
   };
 
@@ -48,8 +55,8 @@ const Login = () => {
         otp,
       });
       alert(response.data.message);
-    } catch {
-      alert('Verification failed');
+    } catch (error) {
+      message.error(error.response.data.error);
     }
   };
 
@@ -59,127 +66,190 @@ const Login = () => {
         email: emailLogin,
       });
       alert(response.data.message);
-    } catch {
-      alert('Send failed');
+    } catch (error) {
+      message.error(error.response.data.error);
     }
   };
+
+  const handleResendOTP = async () => {
+    try {
+      const response = await axiosInstance.post('/api/auth/resend-otp', {
+        email,
+      });
+      alert(response.data.message);
+    } catch (error) {
+      message.error(error.response.data.error);
+    }
+  };
+
+  const [isSignIn, setIsSignIn] = useState(false);
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setIsSignIn(true);
+    }, 200);
+    return () => clearTimeout(timer);
+  }, []);
+
+  const toggle = () => {
+    setIsSignIn((prev) => !prev);
+  };
   return (
-    <div className="wrapper-login w-full h-full flex items-center justify-center">
-      <div className="login-main">
-        <input
-          className="input-login"
-          type="checkbox"
-          id="chk"
-          aria-hidden="true"
-        />
+    <div className={`container-login ${isSignIn ? 'sign-in' : 'sign-up'}`}>
+      <div className="row">
+        <div className="col align-items-center flex-col sign-up">
+          <div className="form-wrapper align-items-center">
+            {isOtpSent ? (
+              <div className="form sign-up">
+                <div className="input-group">
+                  <i className="bx bxs-user"></i>
+                  <input
+                    type="text"
+                    placeholder="Nhập OTP"
+                    onChange={(e) => setOtp(e.target.value)}
+                    value={otp}
+                  />
+                </div>
 
-        <div className="signup">
-          <label className="label-login" htmlFor="chk" aria-hidden="true">
-            Sign up
-          </label>
+                <button onClick={handleVerifyOtp}>Xác nhận</button>
 
-          {isOtpSent ? (
-            <>
-              <input
-                className="input-login"
-                onChange={(e) => setOtp(e.target.value)}
-                name="otp"
-                placeholder="OTP"
-                required
-              />
-              <button className="button-login" onClick={handleVerifyOtp}>
-                Verify OTP
-              </button>
-            </>
-          ) : (
-            <>
-              <input
-                className="input-login"
-                onChange={(e) => setEmail(e.target.value)}
-                type="email"
-                name="email"
-                placeholder="Email"
-                required
-              />
-
-              <input
-                className="input-login"
-                onChange={(e) => setPassword(e.target.value)}
-                type="password"
-                name="pswd"
-                placeholder="Password"
-                required
-              />
-              <button className="button-login" onClick={handleRegister}>
-                Sign up
-              </button>
-            </>
-          )}
+                <p>
+                  <b
+                    onClick={() => {
+                      setIsOtpSent(false);
+                    }}
+                    className="pointer"
+                  >
+                    Quay lại
+                  </b>
+                </p>
+                <p>
+                  <span>Bạn có vấn đề?</span>
+                  <b onClick={handleResendOTP} className="pointer">
+                    Gửi lại OTP
+                  </b>
+                </p>
+              </div>
+            ) : (
+              <div className="form sign-up">
+                <div className="input-group">
+                  <i className="bx bxs-user"></i>
+                  <input
+                    type="text"
+                    placeholder="Họ và tên"
+                    onChange={(e) => setName(e.target.value)}
+                    value={name}
+                  />
+                </div>
+                <div className="input-group">
+                  <i className="bx bx-mail-send"></i>
+                  <input
+                    type="email"
+                    placeholder="Email"
+                    onChange={(e) => setEmail(e.target.value)}
+                    value={email}
+                  />
+                </div>
+                <div className="input-group">
+                  <i className="bx bxs-lock-alt"></i>
+                  <input
+                    type="password"
+                    placeholder="Mật khẩu"
+                    onChange={(e) => setPassword(e.target.value)}
+                    value={password}
+                  />
+                </div>
+                <div className="input-group">
+                  <i className="bx bxs-lock-alt"></i>
+                  <input
+                    type="password"
+                    placeholder="Xác nhận mật khẩu"
+                    onChange={(e) => setPasswordConfirm(e.target.value)}
+                    value={passwordConfirm}
+                  />
+                </div>
+                <button onClick={handleRegister}>Đăng ký</button>
+                <p>
+                  <span>Đã có tài khoản?</span>
+                  <b onClick={toggle} className="pointer">
+                    Đăng nhập tại đây
+                  </b>
+                </p>
+              </div>
+            )}
+          </div>
         </div>
+        <div className="col align-items-center flex-col sign-in">
+          <div className="form-wrapper align-items-center">
+            <div className="form sign-in">
+              <div className="input-group">
+                <i className="bx bxs-user"></i>
+                <input
+                  type="email"
+                  placeholder="Email"
+                  onChange={(e) => setEmailLogin(e.target.value)}
+                  required
+                />
+              </div>
+              {!isForgotPassword && (
+                <div className="input-group">
+                  <i className="bx bxs-lock-alt"></i>
+                  <input
+                    type="password"
+                    placeholder="Mật khẩu"
+                    onChange={(e) => setPasswordLogin(e.target.value)}
+                    required
+                  />
+                </div>
+              )}
 
-        <div className="login">
-          {isForgotPassword ? (
-            <>
-              <label className="label-login" htmlFor="chk" aria-hidden="true">
-                Login
-              </label>
-              <input
-                className="input-login"
-                onChange={(e) => setEmailLogin(e.target.value)}
-                type="email"
-                name="email"
-                placeholder="Email"
-                required
-              />
-
-              <button className="button-login" onClick={handleForgotPassword}>
-                Send
+              <button
+                onClick={() => {
+                  if (isForgotPassword) {
+                    handleForgotPassword();
+                  } else {
+                    handleLogin();
+                  }
+                }}
+              >
+                {isForgotPassword ? 'Gửi' : 'Đăng nhập'}
               </button>
 
-              <div
-                onClick={() => {
-                  setIsForgotPassword(false);
-                }}
-                className="flex items-center justify-center cursor-pointer text-[#573b8a]"
-              >
-                Back to login
-              </div>
-            </>
-          ) : (
-            <>
-              <label className="label-login" htmlFor="chk" aria-hidden="true">
-                Login
-              </label>
-              <input
-                className="input-login"
-                onChange={(e) => setEmailLogin(e.target.value)}
-                type="email"
-                name="email"
-                placeholder="Email"
-                required
-              />
-              <input
-                className="input-login"
-                onChange={(e) => setPasswordLogin(e.target.value)}
-                type="password"
-                name="pswd"
-                placeholder="Password"
-                required
-              />
-              <button className="button-login" onClick={handleLogin}>
-                Login
-              </button>
-
-              <div
-                onClick={() => {
-                  setIsForgotPassword(true);
-                }}
-                className="flex items-center justify-center cursor-pointer text-[#573b8a]"
-              >
-                Forgot password
-              </div>
-            </>
-          )}
+              <p>
+                <b
+                  onClick={() => {
+                    if (isForgotPassword) {
+                      setIsForgotPassword(false);
+                    } else {
+                      setIsForgotPassword(true);
+                    }
+                  }}
+                  className="cursor-pointer"
+                >
+                  {isForgotPassword ? 'Quay lại' : 'Quên mật khẩu?'}
+                </b>
+              </p>
+              <p>
+                <span>Nếu bạn chưa có tài khoản?</span>
+                <b onClick={toggle} className="pointer">
+                  Đăng ký tại đây
+                </b>
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div className="row content-row">
+        <div className="col align-items-center flex-col">
+          <div className="text sign-in">
+            <h2>Đăng nhập</h2>
+          </div>
+          <div className="img sign-in"></div>
+        </div>
+        <div className="col align-items-center flex-col">
+          <div className="img sign-up"></div>
+          <div className="text sign-up">
+            <h2>Đăng ký</h2>
+          </div>
         </div>
       </div>
     </div>

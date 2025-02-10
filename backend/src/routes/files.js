@@ -156,6 +156,62 @@ router.get('/generate-temp-pfx', authenticate, async (req, res) => {
 
     // 🔹 1. Lấy Private Key từ Database
     const userQuery = await pool.query(
+      'SELECT private_key, public_key FROM users WHERE id = $1',
+      [userId]
+    );
+    if (userQuery.rows.length === 0) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+    const privateKeyPem = userQuery.rows[0].private_key;
+    const publicKeyPem = userQuery.rows[0].public_key;
+
+    // 🔹 2. Lưu Private Key vào file tạm
+    const privateKeyPath = path.join(tempDir, `private-key.pem`);
+    fs.writeFileSync(privateKeyPath, privateKeyPem);
+
+    const publicKeyPath = path.join(tempDir, `public-key.pem`);
+    fs.writeFileSync(publicKeyPath, publicKeyPem);
+
+    // 🔹 3. Tạo CSR (Certificate Signing Request)
+    const csrPath = path.join(tempDir, `csr.pem`);
+    execSync(
+      `openssl req -new -key ${privateKeyPath} -out ${csrPath} -subj "/C=US/ST=CA/L=SanFrancisco/O=MyCompany/OU=IT/CN=user-${userId}"`
+    );
+
+    // 🔹 4. Tạo Self-Signed Certificate
+    const certPath = path.join(tempDir, `certificate.pem`);
+    execSync(
+      `openssl x509 -req -days 365 -in ${csrPath} -signkey ${privateKeyPath} -out ${certPath}`
+    );
+
+    // 🔹 5. Tạo file `.pfx`
+    const pfxPath = path.join(tempDir, `certificate.pfx`);
+    execSync(
+      `openssl pkcs12 -export -out ${pfxPath} -inkey ${privateKeyPath} -in ${certPath} -passout pass:${pfxPassword}`
+    );
+
+    // 🔹 6. Trả về đường dẫn file `.pfx` & password
+    res.json({ pfxPath, pfxPassword });
+  } catch (error) {
+    console.error('Error generating PFX:', error);
+    res.status(500).json({ error: 'Failed to generate PFX' });
+  }
+});
+
+router.get('/generate-file-to-verify', authenticate, async (req, res) => {
+  const tempDir = path.join(__dirname, '../../../frontend/public/verify');
+
+  if (!fs.existsSync(tempDir)) fs.mkdirSync(tempDir);
+
+  try {
+    console.log('req', req.query, req.params);
+
+    const { userId } = req.query;
+
+    const pfxPassword = 'key-password'; // 🔐 Mật khẩu bảo vệ file PFX
+
+    // 🔹 1. Lấy Private Key từ Database
+    const userQuery = await pool.query(
       'SELECT private_key FROM users WHERE id = $1',
       [userId]
     );
