@@ -12,7 +12,7 @@ import {
   Space,
 } from 'antd';
 import React, { useEffect, useState } from 'react';
-import { User, useUser } from '../../context/UserContext';
+import { useUser } from '../../context/UserContext';
 import dayjs from 'dayjs';
 import axiosInstance from '../../api/axiosConfig';
 
@@ -65,8 +65,6 @@ export const Profile = () => {
 
   const handleUpdateInfoUser = async (values) => {
     try {
-      console.log(values);
-
       const res = await axiosInstance.put('/api/user/user', {
         name: values.name,
         phone: values.phonenumber,
@@ -80,7 +78,23 @@ export const Profile = () => {
         refreshUser();
       }
     } catch (error) {
-      message.success('Cập nhật thông tin thành công!');
+      message.error(error.response.data.error);
+    }
+  };
+
+  const handleChangePassword = async (values) => {
+    try {
+      const res = await axiosInstance.put('/api/user/change-password', {
+        oldPassword: values.oldPassword,
+        newPassword: values.newPassword,
+        confirmPassword: values.confirmPassword,
+      });
+
+      if (res.status === 200) {
+        message.success('Cập nhật mật khẩu thành công!');
+      }
+    } catch (error) {
+      message.error(error.response.data.error);
     }
   };
   return (
@@ -218,27 +232,28 @@ export const Profile = () => {
                   layout="vertical"
                   autoComplete="off"
                   className="w-full"
+                  onFinish={handleChangePassword}
                 >
                   <Form.Item
-                    name="pass-old"
+                    name="oldPassword"
                     label="Mật khẩu hiện tại"
                     rules={[{ required: true }]}
                   >
-                    <Input />
+                    <Input type="password" />
                   </Form.Item>
                   <Form.Item
-                    name="pass-new"
+                    name="newPassword"
                     label="Mật khẩu mới"
                     rules={[{ required: true }]}
                   >
-                    <Input />
+                    <Input type="password" />
                   </Form.Item>
                   <Form.Item
-                    name="pass-verify"
+                    name="confirmPassword"
                     label="Xác nhận mật khẩu mới"
                     rules={[{ required: true }]}
                   >
-                    <Input />
+                    <Input type="password" />
                   </Form.Item>
                   <Form.Item>
                     <Space className="w-full flex items-center">

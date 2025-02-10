@@ -45,7 +45,7 @@ router.get('/user', authenticate, async (req, res) => {
 router.put('/user', authenticate, upload.single('avatar'), async (req, res) => {
   try {
     const userId = req.user.id;
-    const { name, password, phone, address, gender, dob } = req.body;
+    const { name, phone, address, gender, dob } = req.body;
     let updatedFields = [];
     let queryValues = [];
 
@@ -71,24 +71,12 @@ router.put('/user', authenticate, upload.single('avatar'), async (req, res) => {
       updatedFields.push('dob = $5');
       queryValues.push(dob);
     }
-    if (password) {
-      const hashedPassword = await bcrypt.hash(password, 10);
-      updatedFields.push('password = $6');
-      queryValues.push(hashedPassword);
-    }
-
-    // if (req.file) {
-    //   updatedFields.push('avatar = $3');
-    //   queryValues.push(req.file.buffer);
-    // }
 
     if (updatedFields.length === 0) {
       return res
         .status(400)
         .json({ error: 'Không có thông tin nào để cập nhật!' });
     }
-
-    console.log(updatedFields.join(', '), queryValues, userId);
 
     const query = `UPDATE users SET ${updatedFields.join(
       ', '
@@ -167,4 +155,45 @@ router.get('/users', authenticate, async (req, res) => {
   }
 });
 
+router.put('/change-password', async (req, res) => {
+  try {
+    const userId = req.user.id;
+
+    const { oldPassword, newPassword, confirmPassword } = req.body;
+
+    if (newPassword !== confirmPassword) {
+      return res
+        .status(400)
+        .json({ error: 'Mật khẩu mới và xác nhận mật khẩu không khớp!' });
+    }
+
+    const userQuery = await pool.query(
+      'SELECT password_hash FROM users WHERE id = $1',
+      [userId]
+    );
+
+    if (userQuery.rows.length === 0) {
+      return res.status(404).json({ error: 'User không tồn tại!' });
+    }
+
+    const storedPassword = userQuery.rows[0].password_hash;
+
+    const isMatch = await bcrypt.compare(oldPassword, storedPassword);
+    if (!isMatch) {
+      return res.status(400).json({ error: 'Mật khẩu cũ không chính xác!' });
+    }
+
+    const hashedNewPassword = await bcrypt.hash(newPassword, 10);
+
+    await pool.query('UPDATE users SET password_hash = $1 WHERE id = $2', [
+      hashedNewPassword,
+      userId,
+    ]);
+
+    res.json({ message: 'Đổi mật khẩu thành công!' });
+  } catch (error) {
+    console.error('Lỗi khi đổi mật khẩu:', error);
+    res.status(500).json({ error: 'Lỗi khi đổi mật khẩu!' });
+  }
+});
 module.exports = router;
