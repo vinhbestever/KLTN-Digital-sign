@@ -1,21 +1,18 @@
-import { useEffect, useState } from 'react';
-import { Bar, Line } from 'react-chartjs-2';
+import { Button, Select, DatePicker } from 'antd';
 import {
-  Chart,
+  Chart as ChartJS,
   CategoryScale,
   LinearScale,
   BarElement,
+  LineElement,
+  PointElement,
   Title,
   Tooltip,
   Legend,
-  PointElement,
-  LineElement,
 } from 'chart.js';
-import axiosInstance from '../../api/axiosConfig';
-import { Button } from 'antd';
+import { Bar, Line } from 'react-chartjs-2';
 
-// ✅ Đăng ký các thành phần Chart.js
-Chart.register(
+ChartJS.register(
   CategoryScale,
   LinearScale,
   BarElement,
@@ -26,50 +23,77 @@ Chart.register(
   Legend
 );
 
+import { useEffect, useState } from 'react';
+import axiosInstance from '../../api/axiosConfig';
+import dayjs from 'dayjs';
+import isoWeek from 'dayjs/plugin/isoWeek';
+
+dayjs.extend(isoWeek);
+
+const { RangePicker } = DatePicker;
+
 const StatsChart = () => {
-  const [chartData, setChartData] = useState<{
-    labels: string[];
-    datasets: any[];
-  }>({
-    labels: ['aaaa'],
-    datasets: [
-      {
-        label: `Số file ký theo `,
-        data: [3],
-        backgroundColor: 'rgba(54, 162, 235, 0.6)',
-        borderColor: 'rgba(54, 162, 235, 1)',
-        borderWidth: 1,
-      },
-    ],
-  });
+  const [chartData, setChartData] = useState({ labels: [], datasets: [] });
+  const [chartType, setChartType] = useState('bar');
+  const [rangeType, setRangeType] = useState('today');
+  const [customRange, setCustomRange] = useState([]);
 
-  const [type, setType] = useState<'week' | 'month'>('week');
-  const [chartType, setChartType] = useState<'bar' | 'horizontalBar' | 'line'>(
-    'bar'
-  );
-
-  //   useEffect(() => {
-  //     fetchStats();
-  //   }, [type]);
+  useEffect(() => {
+    fetchStats();
+  }, [rangeType, customRange]);
 
   const fetchStats = async () => {
     try {
-      const response = await axiosInstance.get(`/api/stats/files?type=${type}`);
+      const { startDate, endDate } = getDateRange(rangeType);
+      const response = await axiosInstance.get(`api/files/statics`, {
+        params: { startDate, endDate, rangeType },
+      });
+
       const data = response.data;
 
-      // Chuyển đổi dữ liệu cho Chart.js
-      const labels = data.map((item: { period: string | number | Date }) =>
-        new Date(item.period).toLocaleDateString()
-      );
-      const values = data.map(
-        (item: { total_files: unknown }) => item.total_files
-      );
+      let labels = [];
+      let values = [];
+
+      if (['today', 'yesterday', 'custom'].includes(rangeType)) {
+        labels = [
+          `${dayjs(startDate).format('DD/MM/YYYY')} - ${dayjs(endDate).format(
+            'DD/MM/YYYY'
+          )}`,
+        ];
+        values = [data.length > 0 ? data[0].total_files : 0];
+      } else if (rangeType === 'last7days') {
+        labels = Array.from({ length: 7 }, (_, i) =>
+          dayjs()
+            .subtract(6 - i, 'day')
+            .format('DD/MM')
+        );
+        values = labels.map((label) => {
+          const found = data.find(
+            (item) => dayjs(item.period).format('DD/MM') === label
+          );
+          return found ? found.total_files : 0;
+        });
+      } else if (['thisMonth', 'lastMonth'].includes(rangeType)) {
+        labels = data.map((item) => `${item.period.split('-')[1]}`);
+
+        values = data.map((item) => item.total_files);
+      } else if (rangeType === 'thisYear') {
+        labels = data.map((item) => `Tháng ${item.period.split('-')[1]}`);
+        values = data.map((item) => item.total_files);
+      } else if (rangeType === 'custom' && customRange.length === 2) {
+        labels = [
+          `${dayjs(customRange[0]).format('DD/MM/YYYY')} - ${dayjs(
+            customRange[1]
+          ).format('DD/MM/YYYY')}`,
+        ];
+        values = [data.reduce((sum, item) => sum + item.total_files, 0)];
+      }
 
       setChartData({
         labels,
         datasets: [
           {
-            label: `Số file ký theo ${type === 'week' ? 'tuần' : 'tháng'}`,
+            label: `Số file ký theo ${formatRangeType(rangeType)}`,
             data: values,
             backgroundColor: 'rgba(54, 162, 235, 0.6)',
             borderColor: 'rgba(54, 162, 235, 1)',
@@ -82,27 +106,107 @@ const StatsChart = () => {
     }
   };
 
+  const getDateRange = (type) => {
+    const today = dayjs().startOf('day').format('YYYY-MM-DD 00:00:00');
+    const ranges = {
+      today: {
+        startDate: today,
+        endDate: dayjs().endOf('day').format('YYYY-MM-DD 23:59:59'),
+      },
+      yesterday: {
+        startDate: dayjs()
+          .subtract(1, 'day')
+          .startOf('day')
+          .format('YYYY-MM-DD 00:00:00'),
+        endDate: dayjs()
+          .subtract(1, 'day')
+          .endOf('day')
+          .format('YYYY-MM-DD 23:59:59'),
+      },
+      last7days: {
+        startDate: dayjs()
+          .subtract(6, 'day')
+          .startOf('day')
+          .format('YYYY-MM-DD 00:00:00'),
+        endDate: dayjs().endOf('day').format('YYYY-MM-DD 23:59:59'),
+      },
+      thisMonth: {
+        startDate: dayjs().startOf('month').format('YYYY-MM-DD 00:00:00'),
+        endDate: dayjs().endOf('day').format('YYYY-MM-DD 23:59:59'),
+      },
+      lastMonth: {
+        startDate: dayjs()
+          .subtract(1, 'month')
+          .startOf('month')
+          .format('YYYY-MM-DD 00:00:00'),
+        endDate: dayjs()
+          .subtract(1, 'month')
+          .endOf('month')
+          .format('YYYY-MM-DD 23:59:59'),
+      },
+      thisYear: {
+        startDate: dayjs().startOf('year').format('YYYY-MM-DD 00:00:00'),
+        endDate: dayjs().endOf('day').format('YYYY-MM-DD 23:59:59'),
+      },
+      custom: {
+        startDate:
+          customRange.length === 2
+            ? customRange[0].format('YYYY-MM-DD HH:mm:ss')
+            : today,
+        endDate:
+          customRange.length === 2
+            ? customRange[1].format('YYYY-MM-DD HH:mm:ss')
+            : today,
+      },
+    };
+    return ranges[type] || { startDate: today, endDate: today };
+  };
+
+  const formatRangeType = (rangeType) => {
+    switch (rangeType) {
+      case 'today':
+        return 'Hôm nay';
+      case 'yesterday':
+        return 'Hôm qua';
+      case 'last7days':
+        return '7 ngày trước';
+      case 'thisMonth':
+        return 'Tháng này';
+      case 'lastMonth':
+        return 'Tháng trước';
+      case 'thisYear':
+        return 'Năm nay';
+      case 'custom':
+        return 'Tùy chỉnh';
+      default:
+        return 'Thống kê';
+    }
+  };
+
   return (
-    <div className="w-full max-w-full min-w-full">
-      <div className="flex justify-between items-start space-x-4 my-4 gap-[10px]">
-        <div className="text-[18px]">Thống kê file đã ký theo Tuần/Tháng</div>
-        <div className="flex  gap-[10px]">
-          <Button
-            type={type === 'week' ? 'primary' : 'default'}
-            onClick={() => setType('week')}
+    <div className="w-full">
+      <div className="flex justify-between items-start gap-[10px]">
+        <div className="text-[18px]">Thống kê file đã ký</div>
+        <div className="flex gap-[10px]">
+          <Select
+            value={rangeType}
+            onChange={setRangeType}
+            style={{ width: 200 }}
           >
-            Theo Tuần
-          </Button>
-          <Button
-            type={type === 'month' ? 'primary' : 'default'}
-            onClick={() => setType('month')}
-          >
-            Theo Tháng
-          </Button>
+            <Select.Option value="today">Hôm nay</Select.Option>
+            <Select.Option value="yesterday">Hôm qua</Select.Option>
+            <Select.Option value="last7days">7 ngày trước</Select.Option>
+            <Select.Option value="thisMonth">Tháng này</Select.Option>
+            <Select.Option value="lastMonth">Tháng trước</Select.Option>
+            <Select.Option value="thisYear">Năm nay</Select.Option>
+            <Select.Option value="custom">Tùy chỉnh</Select.Option>
+          </Select>
+          {rangeType === 'custom' && (
+            <RangePicker onChange={(dates) => setCustomRange(dates || [])} />
+          )}
         </div>
       </div>
 
-      {/* 🔹 Hiển thị Biểu Đồ */}
       {chartType === 'bar' && (
         <Bar
           data={chartData}

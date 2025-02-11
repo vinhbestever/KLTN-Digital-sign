@@ -1,5 +1,5 @@
 import { Avatar, Input, Table } from 'antd';
-import { Key, useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import axiosInstance from '../../api/axiosConfig';
 
 const { Search } = Input;
@@ -20,7 +20,7 @@ export const TableUser = ({ setUserVerify }) => {
     setLoading(true);
     try {
       const response = await axiosInstance.get(`api/user/users`, {
-        params: { page, pageSize, search: searchTerm },
+        params: { page, pageSize, search: searchTerm, filterVerified: true },
       });
       setData(response.data.users);
       setTotal(response.data.total);
@@ -119,6 +119,7 @@ export const TableUser = ({ setUserVerify }) => {
             setPageSize(pageSize);
           },
         }}
+        scroll={{ y: 55 * 8 }}
       />
     </div>
   );

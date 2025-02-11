@@ -1,155 +1,65 @@
-import { DatePicker, GetProp, Input, Table, TableProps } from 'antd';
-import { SorterResult } from 'antd/es/table/interface';
-import React, { useEffect, useState } from 'react';
-import qs from 'qs';
-type ColumnsType<T extends object = object> = TableProps<T>['columns'];
-type TablePaginationConfig = Exclude<
-  GetProp<TableProps, 'pagination'>,
-  boolean
->;
+import { Table } from 'antd';
+import { useEffect, useState } from 'react';
+import axiosInstance from '../../api/axiosConfig';
 
-import { createStyles } from 'antd-style';
-
-const { Search } = Input;
-const { RangePicker } = DatePicker;
-
-const useStyle = createStyles(({ css, token }) => {
-  const { antCls } = token;
-  return {
-    customTable: css`
-      ${antCls}-table {
-        ${antCls}-table-container {
-          ${antCls}-table-body,
-          ${antCls}-table-content {
-            scrollbar-width: thin;
-            scrollbar-color: #eaeaea transparent;
-            scrollbar-gutter: stable;
-          }
-        }
-      }
-    `,
-  };
-});
-interface DataType {
-  name: {
-    first: string;
-    last: string;
-  };
-  gender: string;
-  email: string;
-  login: {
-    uuid: string;
-  };
-}
-
-interface TableParams {
-  pagination?: TablePaginationConfig;
-  sortField?: SorterResult<unknown>['field'];
-  sortOrder?: SorterResult<unknown>['order'];
-  filters?: Parameters<GetProp<TableProps, 'onChange'>>[1];
-}
-
-const columns: ColumnsType<DataType> = [
-  {
-    title: 'Name',
-    dataIndex: 'name',
-    sorter: true,
-    render: (name) => `${name.first} ${name.last}`,
-    width: '20%',
-  },
-  {
-    title: 'Gender',
-    dataIndex: 'gender',
-    filters: [
-      { text: 'Male', value: 'male' },
-      { text: 'Female', value: 'female' },
-    ],
-    width: '20%',
-  },
-  {
-    title: 'Email',
-    dataIndex: 'email',
-  },
-];
-
-const getRandomuserParams = (params: TableParams) => ({
-  results: params.pagination?.pageSize,
-  page: params.pagination?.current,
-  ...params,
-});
-export const TableSign = () => {
-  const [data, setData] = useState<DataType[]>();
+const TableSign = () => {
+  const [files, setFiles] = useState([]);
   const [loading, setLoading] = useState(false);
-  const [tableParams, setTableParams] = useState<TableParams>({
-    pagination: {
-      current: 1,
-      pageSize: 10,
-    },
-  });
-  const { styles } = useStyle();
 
-  const fetchData = () => {
+  useEffect(() => {
+    fetchRecentSignedFiles();
+  }, []);
+
+  const fetchRecentSignedFiles = async () => {
     setLoading(true);
-    fetch(
-      `https://randomuser.me/api?${qs.stringify(
-        getRandomuserParams(tableParams)
-      )}`
-    )
-      .then((res) => res.json())
-      .then(({ results }) => {
-        setData(results);
-        setLoading(false);
-        setTableParams({
-          ...tableParams,
-          pagination: {
-            ...tableParams.pagination,
-            total: 200,
-            // 200 is mock data, you should read it from server
-            // total: data.totalCount,
-          },
-        });
-      });
-  };
-
-  useEffect(fetchData, [
-    tableParams.pagination?.current,
-    tableParams.pagination?.pageSize,
-    tableParams?.sortOrder,
-    tableParams?.sortField,
-    JSON.stringify(tableParams.filters),
-  ]);
-
-  const handleTableChange: TableProps<DataType>['onChange'] = (
-    pagination,
-    filters,
-    sorter
-  ) => {
-    setTableParams({
-      pagination,
-      filters,
-      sortOrder: Array.isArray(sorter) ? undefined : sorter.order,
-      sortField: Array.isArray(sorter) ? undefined : sorter.field,
-    });
-
-    // `dataSource` is useless since `pageSize` changed
-    if (pagination.pageSize !== tableParams.pagination?.pageSize) {
-      setData([]);
+    try {
+      const response = await axiosInstance.get(`/api/files/recent-files`);
+      setFiles(response.data.files);
+    } catch (error) {
+      console.error('Lỗi khi lấy file gần đây:', error);
+    } finally {
+      setLoading(false);
     }
   };
-  return (
-    <div className="flex flex-col w-full h-full gap-[18px]">
-      <div className="text-[18px]">Thống kê file ký gần đây</div>
 
-      <Table<DataType>
-        columns={columns}
-        className={styles.customTable}
-        rowKey={(record) => record.login.uuid}
-        dataSource={data}
-        pagination={tableParams.pagination}
-        loading={loading}
-        onChange={handleTableChange}
-        scroll={{ y: 55 * 4 }}
-      />
+  const columns = [
+    {
+      title: 'Số thứ tự',
+      dataIndex: 'index',
+      key: 'index',
+      render: (_, __, index) => index + 1,
+    },
+    {
+      title: 'File Ký',
+      dataIndex: 'file_name',
+      key: 'file_name',
+    },
+    {
+      title: 'Ngày Ký',
+      dataIndex: 'signed_at',
+      key: 'signed_at',
+      render: (signed_at) => new Date(signed_at).toLocaleDateString(),
+    },
+  ];
+
+  return (
+    <div className="w-full">
+      <div className="flex flex-col w-full justify-between items-start gap-[10px] overflow-y-auto">
+        <div className="text-[18px]">
+          Danh sách file đã ký trong 7 ngày gần nhất
+        </div>
+
+        <Table
+          style={{ width: '100%' }}
+          columns={columns}
+          pagination={false}
+          dataSource={files}
+          loading={loading}
+          rowKey="id"
+        />
+      </div>
     </div>
   );
 };
+
+export default TableSign;

@@ -16,6 +16,7 @@ const fs = require('fs');
 const path = require('path');
 const { execSync } = require('child_process');
 const forge = require('node-forge');
+const dayjs = require('dayjs');
 
 // Route Verify File
 router.post(
@@ -100,48 +101,69 @@ router.post(
 );
 
 // API để lấy danh sách file đã ký
-router.get('/signed-files', async (req, res) => {
+router.get('/signed-files', authenticate, async (req, res) => {
   try {
-    const userId = req.user.id; // Lấy ID người dùng từ token
+    const {
+      search = '',
+      startDate,
+      endDate,
+      page = 1,
+      pageSize = 10,
+    } = req.query;
+    const offset = (page - 1) * pageSize;
 
-    // Truy vấn danh sách file đã ký của người dùng
-    const result = await pool.query(
-      'SELECT id, file_name, created_at FROM files WHERE user_id = $1 AND signed_content IS NOT NULL ORDER BY created_at DESC',
-      [userId]
+    let query = `
+      SELECT id, file_name, signed_at 
+      FROM signed_files 
+      WHERE file_name ILIKE $1`;
+
+    let queryParams = [`%${search}%`];
+
+    if (startDate && endDate) {
+      query += ` AND signed_at BETWEEN $2 AND $3`;
+      queryParams.push(startDate, endDate);
+    }
+
+    query += ` ORDER BY signed_at DESC LIMIT $${
+      queryParams.length + 1
+    } OFFSET $${queryParams.length + 2}`;
+    queryParams.push(pageSize, offset);
+
+    const files = await pool.query(query, queryParams);
+    const total = await pool.query(
+      `SELECT COUNT(*) FROM signed_files WHERE file_name ILIKE $1`,
+      [`%${search}%`]
     );
 
-    res.json(result.rows);
+    res.json({ files: files.rows, total: parseInt(total.rows[0].count) });
   } catch (error) {
-    console.error('Error fetching signed files:', error.stack);
-    res.status(500).json({ error: 'Failed to fetch signed files' });
+    console.error('Lỗi khi lấy danh sách file đã ký:', error);
+    res.status(500).json({ error: 'Lỗi khi lấy danh sách file đã ký!' });
   }
 });
 
 // API để tải file đã ký
-router.get('/download-signed/:id', async (req, res) => {
-  const fileId = req.params.id;
-
+router.get('/download-signed/:fileId', authenticate, async (req, res) => {
   try {
+    const { fileId } = req.params;
+
     const result = await pool.query(
-      'SELECT file_name, signed_content FROM files WHERE id = $1 AND user_id = $2',
-      [fileId, req.user.id]
+      `SELECT file_name, signed_file FROM signed_files WHERE id = $1`,
+      [fileId]
     );
 
     if (result.rows.length === 0) {
-      return res
-        .status(404)
-        .json({ error: 'Signed file not found or not authorized' });
+      return res.status(404).json({ error: 'Không tìm thấy file đã ký!' });
     }
 
-    const { file_name: fileName, signed_content: signedContent } =
-      result.rows[0];
+    const { file_name, signed_file } = result.rows[0];
 
-    res.setHeader('Content-Disposition', `attachment; filename=${fileName}`);
+    res.setHeader('Content-Disposition', `attachment; filename="${file_name}"`);
     res.setHeader('Content-Type', 'application/pdf');
-    res.send(signedContent);
+    res.send(signed_file);
   } catch (error) {
-    console.error('Error downloading signed file:', error.stack);
-    res.status(500).json({ error: 'Failed to download signed file' });
+    console.error('Lỗi khi tải file đã ký:', error);
+    res.status(500).json({ error: 'Lỗi khi tải file đã ký!' });
   }
 });
 
@@ -298,4 +320,114 @@ router.post(
     }
   }
 );
+
+router.get('/statics', authenticate, async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const { rangeType, startDate, endDate } = req.query;
+
+    if (!userId) {
+      return res.status(400).json({ error: 'Thiếu userId!' });
+    }
+
+    let query;
+    let queryParams = [userId, startDate, endDate];
+
+    switch (rangeType) {
+      case 'today':
+      case 'yesterday':
+      case 'custom':
+        query = `
+          SELECT 'Total' AS period, COUNT(*) AS total_files
+          FROM signed_files
+          WHERE user_id = $1 AND signed_at BETWEEN $2 AND $3
+        `;
+        break;
+
+      case 'last7days':
+        query = `
+          SELECT TO_CHAR(signed_at, 'YYYY-MM-DD') AS period, COUNT(*) AS total_files
+          FROM signed_files
+          WHERE user_id = $1 AND signed_at BETWEEN $2 AND $3
+          GROUP BY period
+          ORDER BY period ASC
+        `;
+        break;
+
+      case 'thisMonth':
+      case 'lastMonth':
+        query = `
+          SELECT TO_CHAR(signed_at, 'YYYY-"Week"W') AS period, COUNT(*) AS total_files
+          FROM signed_files
+          WHERE user_id = $1 AND signed_at BETWEEN $2 AND $3
+          GROUP BY period
+          ORDER BY period ASC
+        `;
+        break;
+
+      case 'thisYear':
+        query = `
+          SELECT TO_CHAR(signed_at, 'YYYY-MM') AS period, COUNT(*) AS total_files
+          FROM signed_files
+          WHERE user_id = $1 AND signed_at BETWEEN $2 AND $3
+          GROUP BY period
+          ORDER BY period ASC
+        `;
+        break;
+
+      default:
+        return res.status(400).json({ error: 'Khoảng thời gian không hợp lệ' });
+    }
+
+    const result = await pool.query(query, queryParams);
+    res.json(result.rows);
+  } catch (error) {
+    console.error('Lỗi khi lấy thống kê file đã ký:', error);
+    res.status(500).json({ error: 'Lỗi khi lấy thống kê!' });
+  }
+});
+
+router.get('/total-signatures', async (req, res) => {
+  try {
+    const userId = req.user.id;
+
+    if (!userId) {
+      return res.status(400).json({ error: 'Thiếu userId!' });
+    }
+
+    const result = await pool.query(
+      `SELECT COUNT(*) AS total FROM signed_files WHERE user_id = $1`,
+      [userId]
+    );
+
+    res.json({ total: parseInt(result.rows[0].total) });
+  } catch (error) {
+    console.error('Lỗi khi lấy tổng số lượt ký:', error);
+    res.status(500).json({ error: 'Lỗi khi lấy tổng số lượt ký!' });
+  }
+});
+
+// API lấy danh sách file đã ký trong 7 ngày gần nhất
+router.get('/recent-files', async (req, res) => {
+  try {
+    const userId = req.user.id;
+
+    if (!userId) {
+      return res.status(400).json({ error: 'Thiếu userId!' });
+    }
+
+    const result = await pool.query(
+      `SELECT id, file_name, signed_at 
+       FROM signed_files 
+       WHERE user_id = $1 AND signed_at >= NOW() - INTERVAL '7 days'
+       ORDER BY signed_at DESC`,
+      [userId]
+    );
+
+    res.json({ files: result.rows });
+  } catch (error) {
+    console.error('Lỗi khi lấy danh sách file gần đây:', error);
+    res.status(500).json({ error: 'Lỗi khi lấy danh sách file!' });
+  }
+});
 module.exports = router;

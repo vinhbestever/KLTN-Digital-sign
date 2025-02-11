@@ -1,150 +1,104 @@
-import {
-  Button,
-  DatePicker,
-  GetProp,
-  Input,
-  Space,
-  Table,
-  TableProps,
-  Tag,
-} from 'antd';
-import { SorterResult } from 'antd/es/table/interface';
+import { Button, DatePicker, Input, Table, message } from 'antd';
 import React, { useEffect, useState } from 'react';
-import qs from 'qs';
-type ColumnsType<T extends object = object> = TableProps<T>['columns'];
-type TablePaginationConfig = Exclude<
-  GetProp<TableProps, 'pagination'>,
-  boolean
->;
-
-import { createStyles } from 'antd-style';
+import axiosInstance from '../../api/axiosConfig';
+import { CloudDownloadOutlined } from '@ant-design/icons';
 
 const { Search } = Input;
 const { RangePicker } = DatePicker;
 
-const useStyle = createStyles(({ css, token }) => {
-  const { antCls } = token;
-  return {
-    customTable: css`
-      ${antCls}-table {
-        ${antCls}-table-container {
-          ${antCls}-table-body,
-          ${antCls}-table-content {
-            scrollbar-width: thin;
-            scrollbar-color: #eaeaea transparent;
-            scrollbar-gutter: stable;
-          }
-        }
-      }
-    `,
-  };
-});
-interface DataType {
-  name: {
-    first: string;
-    last: string;
-  };
-  gender: string;
-  email: string;
-  login: {
-    uuid: string;
-  };
-}
-
-interface TableParams {
-  pagination?: TablePaginationConfig;
-  sortField?: SorterResult<unknown>['field'];
-  sortOrder?: SorterResult<unknown>['order'];
-  filters?: Parameters<GetProp<TableProps, 'onChange'>>[1];
-}
-
-const columns: ColumnsType<DataType> = [
-  {
-    title: 'Name',
-    dataIndex: 'name',
-    sorter: true,
-    render: (name) => `${name.first} ${name.last}`,
-    width: '20%',
-  },
-  {
-    title: 'Gender',
-    dataIndex: 'gender',
-    filters: [
-      { text: 'Male', value: 'male' },
-      { text: 'Female', value: 'female' },
-    ],
-    width: '20%',
-  },
-  {
-    title: 'Email',
-    dataIndex: 'email',
-  },
-];
-
-const getRandomuserParams = (params: TableParams) => ({
-  results: params.pagination?.pageSize,
-  page: params.pagination?.current,
-  ...params,
-});
 export const History = () => {
-  const [data, setData] = useState<DataType[]>();
+  const [files, setFiles] = useState([]);
   const [loading, setLoading] = useState(false);
-  const [tableParams, setTableParams] = useState<TableParams>({
-    pagination: {
-      current: 1,
-      pageSize: 10,
-    },
-  });
-  const { styles } = useStyle();
+  const [searchTerm, setSearchTerm] = useState('');
+  const [dateRange, setDateRange] = useState([]);
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
+  const [total, setTotal] = useState(0);
 
-  const fetchData = () => {
+  useEffect(() => {
+    fetchSignedFiles();
+  }, [searchTerm, dateRange, page, pageSize]);
+
+  const fetchSignedFiles = async () => {
     setLoading(true);
-    fetch(
-      `https://randomuser.me/api?${qs.stringify(
-        getRandomuserParams(tableParams)
-      )}`
-    )
-      .then((res) => res.json())
-      .then(({ results }) => {
-        setData(results);
-        setLoading(false);
-        setTableParams({
-          ...tableParams,
-          pagination: {
-            ...tableParams.pagination,
-            total: 200,
-            // 200 is mock data, you should read it from server
-            // total: data.totalCount,
-          },
-        });
+    try {
+      const response = await axiosInstance.get('api/files/signed-files', {
+        params: {
+          search: searchTerm,
+          startDate:
+            dateRange.length > 0 ? dateRange[0].format('YYYY-MM-DD') : null,
+          endDate:
+            dateRange.length > 0 ? dateRange[1].format('YYYY-MM-DD') : null,
+          page,
+          pageSize,
+        },
       });
-  };
-
-  useEffect(fetchData, [
-    tableParams.pagination?.current,
-    tableParams.pagination?.pageSize,
-    tableParams?.sortOrder,
-    tableParams?.sortField,
-    JSON.stringify(tableParams.filters),
-  ]);
-
-  const handleTableChange: TableProps<DataType>['onChange'] = (
-    pagination,
-    filters,
-    sorter
-  ) => {
-    setTableParams({
-      pagination,
-      filters,
-      sortOrder: Array.isArray(sorter) ? undefined : sorter.order,
-      sortField: Array.isArray(sorter) ? undefined : sorter.field,
-    });
-
-    // `dataSource` is useless since `pageSize` changed
-    if (pagination.pageSize !== tableParams.pagination?.pageSize) {
-      setData([]);
+      setFiles(response.data.files);
+      setTotal(response.data.total);
+    } catch (error) {
+      console.error('Lỗi khi lấy danh sách file đã ký:', error);
+    } finally {
+      setLoading(false);
     }
   };
+
+  const handleDownload = async (fileId, fileName) => {
+    try {
+      console.log('(fileId, fileName', fileId, fileName);
+
+      const response = await axiosInstance.get(
+        `api/files/download-signed/${fileId}`,
+        {
+          responseType: 'blob',
+        }
+      );
+
+      const url = window.URL.createObjectURL(new Blob([response.data]));
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = fileName;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      message.success('Tải file thành công!');
+    } catch (error) {
+      console.error('Lỗi khi tải file đã ký:', error);
+      message.error('Lỗi khi tải file!');
+    }
+  };
+
+  const columns = [
+    {
+      title: 'Số Thứ Tự',
+      dataIndex: 'index',
+      key: 'index',
+      render: (_, __, index) => (page - 1) * pageSize + index + 1,
+    },
+    {
+      title: 'Tên File',
+      dataIndex: 'file_name',
+      key: 'file_name',
+    },
+    {
+      title: 'Ngày Đã Ký',
+      dataIndex: 'signed_at',
+      key: 'signed_at',
+      render: (signed_at) => new Date(signed_at).toLocaleDateString(),
+    },
+    {
+      title: 'Hành Động',
+      key: 'action',
+      render: (record) => (
+        <div className="ml-9">
+          <Button
+            onClick={() => handleDownload(record.id, record.file_name)}
+            icon={<CloudDownloadOutlined />}
+          ></Button>
+        </div>
+      ),
+    },
+  ];
+
   return (
     <div className="p-[32px] flex flex-col w-full h-full gap-[18px]">
       <div className="text-[22px] font-medium">Lịch sử ký</div>
@@ -154,7 +108,13 @@ export const History = () => {
 
           <div className="flex items-center justify-end gap-[10px]">
             <Button type="primary">Xuất báo cáo</Button>
-            <Button>Ký mới</Button>
+            <Button
+              onClick={() => {
+                window.location.href = '/sign';
+              }}
+            >
+              Ký mới
+            </Button>
           </div>
         </div>
 
@@ -162,19 +122,31 @@ export const History = () => {
           <Search
             placeholder="Tìm kiếm tên file"
             allowClear
+            onSearch={(value) => setSearchTerm(value)}
             style={{ width: 350 }}
           />
-
-          <RangePicker placeholder={['Từ ngày', 'Đến ngày']} />
+          <RangePicker
+            placeholder={['Từ ngày', 'Đến ngày']}
+            onChange={(dates) => setDateRange(dates || [])}
+          />
         </div>
-        <Table<DataType>
+
+        <Table
           columns={columns}
-          className={styles.customTable}
-          rowKey={(record) => record.login.uuid}
-          dataSource={data}
-          pagination={tableParams.pagination}
+          dataSource={files}
           loading={loading}
-          onChange={handleTableChange}
+          rowKey="id"
+          style={{ width: '100%' }}
+          pagination={{
+            current: page,
+            pageSize: pageSize,
+            total: total,
+            showSizeChanger: true,
+            onChange: (page, pageSize) => {
+              setPage(page);
+              setPageSize(pageSize);
+            },
+          }}
           scroll={{ y: 55 * 8 }}
         />
       </div>

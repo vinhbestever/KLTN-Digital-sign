@@ -57,8 +57,8 @@ export const Profile = () => {
         name: user.name,
         phonenumber: user.phone,
         address: user.address,
-        gender: user.gender, // 🔹 Đổi "location" thành "gender"
-        birthday: user.dob ? dayjs(user.dob) : null, // 🔹 Chuyển đổi thành `dayjs`
+        gender: user.gender,
+        birthday: user.dob ? dayjs(user.dob) : null,
       });
     }
   }, [user, form]);

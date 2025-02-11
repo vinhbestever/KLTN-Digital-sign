@@ -103,7 +103,7 @@ router.delete('/user', authenticate, async (req, res) => {
   }
 });
 
-router.get('/avatar/:userId', async (req, res) => {
+router.get('/avatar/:userId', authenticate, async (req, res) => {
   try {
     const { userId } = req.params;
     const avatarQuery = await pool.query(
@@ -125,37 +125,40 @@ router.get('/avatar/:userId', async (req, res) => {
 
 router.get('/users', authenticate, async (req, res) => {
   try {
-    const { page = 1, pageSize = 10, search = '' } = req.query;
+    const { page = 1, pageSize = 10, search = '', filterVerified } = req.query;
     const offset = (page - 1) * pageSize;
 
-    const usersQuery = `
-      SELECT id, name, email, phone, address, gender, dob, role, avatar
-      FROM users
-      WHERE LOWER(name) LIKE LOWER($1)
-      ORDER BY id ASC
-      LIMIT $2 OFFSET $3
-    `;
+    let query = `
+      SELECT id, avatar, name, email, phone, address, gender, dob, role, is_verified 
+      FROM users 
+      WHERE name ILIKE $1`;
 
-    const countQuery = `SELECT COUNT(*) FROM users WHERE LOWER(name) LIKE LOWER($1)`;
+    let queryParams = [`%${search}%`];
 
-    const users = await pool.query(usersQuery, [
-      `%${search}%`,
-      pageSize,
-      offset,
-    ]);
-    const totalUsers = await pool.query(countQuery, [`%${search}%`]);
+    // 🔹 Nếu `filterVerified = true`, chỉ lấy user đã xác thực
+    if (filterVerified === 'true') {
+      query += ` AND is_verified = true`;
+    }
 
-    res.json({
-      users: users.rows,
-      total: parseInt(totalUsers.rows[0].count, 10),
-    });
+    query += ` ORDER BY id LIMIT $2 OFFSET $3`;
+    queryParams.push(pageSize, offset);
+
+    const users = await pool.query(query, queryParams);
+    const total = await pool.query(
+      `SELECT COUNT(*) FROM users WHERE name ILIKE $1 ${
+        filterVerified === 'true' ? 'AND is_verified = true' : ''
+      }`,
+      [`%${search}%`]
+    );
+
+    res.json({ users: users.rows, total: parseInt(total.rows[0].count) });
   } catch (error) {
     console.error('Lỗi khi lấy danh sách user:', error);
     res.status(500).json({ error: 'Lỗi khi lấy danh sách user!' });
   }
 });
 
-router.put('/change-password', async (req, res) => {
+router.put('/change-password', authenticate, async (req, res) => {
   try {
     const userId = req.user.id;
 
@@ -194,6 +197,49 @@ router.put('/change-password', async (req, res) => {
   } catch (error) {
     console.error('Lỗi khi đổi mật khẩu:', error);
     res.status(500).json({ error: 'Lỗi khi đổi mật khẩu!' });
+  }
+});
+
+router.put('/users/:id', authenticate, async (req, res) => {
+  try {
+    const { name, phone, address, gender, dob, role } = req.body;
+    const { id } = req.params;
+
+    const query = `
+      UPDATE users 
+      SET name = $1, phone = $2, address = $3, gender = $4, dob = $5, role = $6 
+      WHERE id = $7 RETURNING *`;
+
+    const result = await pool.query(query, [
+      name,
+      phone,
+      address,
+      gender,
+      dob,
+      role,
+      id,
+    ]);
+
+    if (result.rowCount === 0) {
+      return res.status(404).json({ error: 'User không tồn tại!' });
+    }
+
+    res.json({ message: 'Cập nhật user thành công!', user: result.rows[0] });
+  } catch (error) {
+    console.error('Lỗi khi cập nhật user:', error);
+    res.status(500).json({ error: 'Lỗi khi cập nhật user!' });
+  }
+});
+
+router.delete('/users/:id', authenticate, async (req, res) => {
+  try {
+    const { id } = req.params;
+    await pool.query('DELETE FROM users WHERE id = $1', [id]);
+
+    res.json({ message: 'Xóa user thành công!' });
+  } catch (error) {
+    console.error('Lỗi khi xóa user:', error);
+    res.status(500).json({ error: 'Lỗi khi xóa user!' });
   }
 });
 module.exports = router;
