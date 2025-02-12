@@ -7,6 +7,7 @@ const upload = multer({ storage: multer.memoryStorage() }); // Lưu file trong b
 const authenticate = require('../middleware/authenticate');
 const bcrypt = require('bcrypt');
 
+// API thông tin người dùng
 router.get('/user', authenticate, async (req, res) => {
   try {
     const userId = req.user.id;
@@ -42,6 +43,7 @@ router.get('/user', authenticate, async (req, res) => {
   }
 });
 
+// API sửa thông tin tài khoản
 router.put('/user', authenticate, upload.single('avatar'), async (req, res) => {
   try {
     const userId = req.user.id;
@@ -103,6 +105,7 @@ router.delete('/user', authenticate, async (req, res) => {
   }
 });
 
+// API avatar người dùng
 router.get('/avatar/:userId', authenticate, async (req, res) => {
   try {
     const { userId } = req.params;
@@ -123,6 +126,7 @@ router.get('/avatar/:userId', authenticate, async (req, res) => {
   }
 });
 
+// API danh sách người dùng
 router.get('/users', authenticate, async (req, res) => {
   try {
     const { page = 1, pageSize = 10, search = '', filterVerified } = req.query;
@@ -135,7 +139,6 @@ router.get('/users', authenticate, async (req, res) => {
 
     let queryParams = [`%${search}%`];
 
-    // 🔹 Nếu `filterVerified = true`, chỉ lấy user đã xác thực
     if (filterVerified === 'true') {
       query += ` AND is_verified = true`;
     }
@@ -158,6 +161,7 @@ router.get('/users', authenticate, async (req, res) => {
   }
 });
 
+// API đổi mật khẩu tài khoản
 router.put('/change-password', authenticate, async (req, res) => {
   try {
     const userId = req.user.id;
@@ -200,6 +204,7 @@ router.put('/change-password', authenticate, async (req, res) => {
   }
 });
 
+// API sửa thông tin người dùng
 router.put('/users/:id', authenticate, async (req, res) => {
   try {
     const { name, phone, address, gender, dob, role } = req.body;
@@ -231,6 +236,7 @@ router.put('/users/:id', authenticate, async (req, res) => {
   }
 });
 
+// API xoá người dùng
 router.delete('/users/:id', authenticate, async (req, res) => {
   try {
     const { id } = req.params;

@@ -34,20 +34,20 @@ const transporter = nodemailer.createTransport({
   },
 });
 
+// Hàm sinh ID
 const generateNextUserId = async () => {
-  // 🔹 Tìm ID lớn nhất hiện tại
   const result = await pool.query(
     "SELECT MAX(id) AS max_id FROM users WHERE id LIKE 'A%'"
   );
 
-  let nextNumber = 1; // 🔹 Mặc định nếu không có user nào
+  let nextNumber = 1; 
   if (result.rows[0].max_id) {
-    const lastId = result.rows[0].max_id; // 🔹 Lấy ID cuối cùng dạng `Axxxxx`
-    const lastNumber = parseInt(lastId.slice(1), 10); // 🔹 Bỏ chữ `A` và lấy số
+    const lastId = result.rows[0].max_id; 
+    const lastNumber = parseInt(lastId.slice(1), 10); 
     nextNumber = lastNumber + 1;
   }
 
-  return `A${String(nextNumber).padStart(5, '0')}`; // 🔹 Format lại `Axxxxx`
+  return `A${String(nextNumber).padStart(5, '0')}`; 
 };
 
 // API Đăng ký
@@ -55,11 +55,28 @@ router.post('/register', async (req, res) => {
   const { email, password, name } = req.body;
 
   try {
-    const userCheck = await pool.query('SELECT * FROM users WHERE email = $1', [
+    const userQuery = await pool.query('SELECT * FROM users WHERE email = $1', [
       email,
     ]);
-    if (userCheck.rows.length > 0) {
-      return res.status(400).json({ error: 'Email đã được đăng ký' });
+    if (userQuery.rows.length > 0) {
+      const user = userQuery.rows[0];
+
+      if (!user.is_verified) {
+        const otp = generateOTP();
+        const otpExpiration = dayjs().add(5, 'minute').toISOString();
+
+        await pool.query('UPDATE users SET otp_code = $1, otp_expiration = $2 WHERE email = $3', [
+          otp,
+          otpExpiration,
+          email,
+        ]);
+
+        await sendOTPEmail(email, otp);
+
+        return res.status(200).json({ message: 'OTP sent to email' });
+      }
+
+      return res.status(400).json({ error: 'Email đã được đăng ký.' });
     }
 
     const tempDir = path.join(__dirname, '../temp');
@@ -125,11 +142,11 @@ router.post('/register', async (req, res) => {
   }
 });
 
+// API xác thực OTP
 router.post('/verify-otp', async (req, res) => {
   const { email, otp } = req.body;
 
   try {
-    // Tìm người dùng
     const userResult = await pool.query(
       'SELECT * FROM users WHERE email = $1',
       [email]
@@ -140,12 +157,10 @@ router.post('/verify-otp', async (req, res) => {
       return res.status(404).json({ error: 'Không tìm thấy email' });
     }
 
-    // Kiểm tra OTP
     if (user.otp_code !== otp || new Date() > new Date(user.otp_expiration)) {
       return res.status(400).json({ error: 'OTP không đúng hoặc bị hết hạn' });
     }
 
-    // Cập nhật trạng thái xác minh
     await pool.query(
       'UPDATE users SET is_verified = true, otp_code = NULL, otp_expiration = NULL WHERE email = $1',
       [email]
@@ -158,6 +173,7 @@ router.post('/verify-otp', async (req, res) => {
   }
 });
 
+// API Login tài khoản
 router.post('/login', async (req, res) => {
   const { email, password } = req.body;
 
@@ -195,7 +211,6 @@ router.post('/forgot-password', async (req, res) => {
   const { email } = req.body;
 
   try {
-    // Kiểm tra email có tồn tại
     const userResult = await pool.query(
       'SELECT * FROM users WHERE email = $1',
       [email]
@@ -204,17 +219,14 @@ router.post('/forgot-password', async (req, res) => {
       return res.status(404).json({ error: 'Không tìm thấy email' });
     }
 
-    // Tạo mật khẩu mới ngẫu nhiên
     const newPassword = crypto.randomBytes(8).toString('hex'); // Mật khẩu 8 ký tự ngẫu nhiên
     const hashedPassword = await bcrypt.hash(newPassword, 10);
 
-    // Cập nhật mật khẩu mới vào cơ sở dữ liệu
     await pool.query('UPDATE users SET password_hash = $1 WHERE email = $2', [
       hashedPassword,
       email,
     ]);
 
-    // Gửi mật khẩu mới qua email
     await transporter.sendMail({
       from: process.env.EMAIL_USER,
       to: email,
@@ -240,10 +252,8 @@ router.post('/refresh-token', (req, res) => {
   }
 
   try {
-    // Xác minh Refresh Token
     const decoded = jwt.verify(refreshToken, 'refresh_secret_key');
 
-    // Tạo Access Token mới
     const newAccessToken = jwt.sign(
       { id: decoded.id, email: decoded.email },
       'access_secret_key',
@@ -257,15 +267,15 @@ router.post('/refresh-token', (req, res) => {
   }
 });
 
+// API lấy khoá của người dùng
 router.get('/get-key/:userId/:fileType', async (req, res) => {
   try {
     const { userId, fileType } = req.params;
 
     if (!['private_key', 'public_key'].includes(fileType)) {
-      return res.status(400).json({ error: 'Loại file không hợp lệ!' });
+      return res.status(400).json({ error: 'Loại khoá không hợp lệ!' });
     }
 
-    // 🔹 Truy vấn database để lấy file
     const query = `SELECT ${fileType} FROM users WHERE id = $1`;
     const result = await pool.query(query, [userId]);
 
@@ -273,12 +283,10 @@ router.get('/get-key/:userId/:fileType', async (req, res) => {
       return res.status(404).json({ error: 'Không tìm thấy file!' });
     }
 
-    // 🔹 Lấy dữ liệu file từ database
     const fileData = result.rows[0][fileType];
     const fileExtension = fileType === 'private_key' ? 'pfx' : 'pem';
     const fileName = `${fileType}-${userId}.${fileExtension}`;
 
-    // 🔹 Thiết lập header để tải file
     res.setHeader('Content-Disposition', `attachment; filename="${fileName}"`);
     res.setHeader(
       'Content-Type',
@@ -287,7 +295,6 @@ router.get('/get-key/:userId/:fileType', async (req, res) => {
         : 'application/x-pem-file'
     );
 
-    // 🔹 Gửi file về client
     if (fileType === 'private_key') {
       res.send(Buffer.from(fileData, 'base64'));
     } else {
@@ -299,11 +306,11 @@ router.get('/get-key/:userId/:fileType', async (req, res) => {
   }
 });
 
+// API gửi lại OTP
 router.post('/resend-otp', async (req, res) => {
   try {
     const { email } = req.body;
 
-    // 🔹 Kiểm tra user có tồn tại không
     const userQuery = `SELECT id, is_verified FROM users WHERE email = $1`;
     const userResult = await pool.query(userQuery, [email]);
 
@@ -315,17 +322,14 @@ router.post('/resend-otp', async (req, res) => {
       return res.status(400).json({ error: 'Tài khoản đã xác thực!' });
     }
 
-    // 🔹 Tạo OTP mới
     const newOTP = generateOTP();
-    const otpExpiration = new Date(Date.now() + 5 * 60 * 1000); // Hết hạn sau 5 phút
+    const otpExpiration = new Date(Date.now() + 5 * 60 * 1000); 
 
-    // 🔹 Cập nhật OTP trong database
     await pool.query(
       `UPDATE users SET otp_code = $1, otp_expiration = $2 WHERE email = $3`,
       [newOTP, otpExpiration, email]
     );
 
-    // 🔹 Gửi email OTP mới
     const mailOptions = {
       from: process.env.EMAIL_USER,
       to: email,

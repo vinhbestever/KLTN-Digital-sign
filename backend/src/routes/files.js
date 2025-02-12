@@ -1,104 +1,10 @@
 const express = require('express');
 const multer = require('multer');
-const crypto = require('crypto');
 const pool = require('../database');
-const { signData } = require('../utils/signature');
-const { PDFDocument, rgb } = require('pdf-lib');
-const { verifySignature } = require('../utils/verify');
-
 const router = express.Router();
-const upload = multer({ storage: multer.memoryStorage() }); // Lưu file trong bộ nhớ tạm
-// const upload = multer({
-//   dest: 'uploads/', // Thư mục tạm lưu file
-// });
+const upload = multer({ storage: multer.memoryStorage() }); 
 const authenticate = require('../middleware/authenticate');
-const fs = require('fs');
-const path = require('path');
-const { execSync } = require('child_process');
-const forge = require('node-forge');
-const dayjs = require('dayjs');
 
-// Route Verify File
-router.post(
-  '/verify',
-  authenticate,
-  upload.single('file'),
-  async (req, res) => {
-    const userId = req.user.id;
-    const file = req.file;
-
-    if (!file) {
-      return res.status(400).json({ error: 'No file uploaded' });
-    }
-
-    try {
-      // Lấy Public Key của user từ database
-      const userQuery = await pool.query(
-        'SELECT public_key FROM users WHERE id = $1',
-        [userId]
-      );
-      if (userQuery.rows.length === 0) {
-        return res.status(404).json({ error: 'User not found' });
-      }
-      const publicKey = userQuery.rows[0].public_key;
-
-      // Đọc file PDF
-      const pdfBytes = fs.readFileSync(file.path);
-      const pdfDoc = await PDFDocument.load(pdfBytes);
-
-      const fileHashAfter = crypto
-        .createHash('sha256')
-        .update(pdfBytes)
-        .digest('hex');
-      console.log('📄 File Hash After Signing:', fileHashAfter);
-      // ✅ Lấy chữ ký từ metadata PDF
-      const metadata = pdfDoc.getKeywords();
-      if (!metadata) {
-        return res.status(400).json({ error: 'Signature not found in file' });
-      }
-
-      let parsedMetadata;
-      try {
-        parsedMetadata = JSON.parse(metadata);
-      } catch (error) {
-        return res
-          .status(400)
-          .json({ error: 'Invalid signature format in file' });
-      }
-
-      const { signature } = parsedMetadata;
-      if (!signature) {
-        return res
-          .status(400)
-          .json({ error: 'Signature not found in metadata' });
-      }
-
-      console.log('signature', signature);
-
-      // ✅ Hash lại nội dung file PDF
-      const uploadedHash = crypto
-        .createHash('sha256')
-        .update(pdfBytes)
-        .digest();
-
-      // ✅ Giải mã chữ ký bằng Public Key
-      const verify = crypto.createVerify('SHA256');
-      verify.update(uploadedHash);
-      verify.end();
-      const isValid = verify.verify(
-        publicKey,
-        Buffer.from(signature, 'base64')
-      );
-
-      res.json({ isValid });
-    } catch (error) {
-      console.error('Error verifying file:', error);
-      res.status(500).json({ error: 'Failed to verify file' });
-    } finally {
-      fs.unlinkSync(file.path);
-    }
-  }
-);
 
 // API để lấy danh sách file đã ký
 router.get('/signed-files', authenticate, async (req, res) => {
@@ -167,137 +73,7 @@ router.get('/download-signed/:fileId', authenticate, async (req, res) => {
   }
 });
 
-router.get('/generate-temp-pfx', authenticate, async (req, res) => {
-  const userId = req.user.id;
-  const tempDir = path.join(__dirname, '../../../frontend/public');
-
-  if (!fs.existsSync(tempDir)) fs.mkdirSync(tempDir);
-
-  try {
-    const pfxPassword = 'key-password'; // 🔐 Mật khẩu bảo vệ file PFX
-
-    // 🔹 1. Lấy Private Key từ Database
-    const userQuery = await pool.query(
-      'SELECT private_key, public_key FROM users WHERE id = $1',
-      [userId]
-    );
-    if (userQuery.rows.length === 0) {
-      return res.status(404).json({ error: 'User not found' });
-    }
-    const privateKeyPem = userQuery.rows[0].private_key;
-    const publicKeyPem = userQuery.rows[0].public_key;
-
-    // 🔹 2. Lưu Private Key vào file tạm
-    const privateKeyPath = path.join(tempDir, `private-key.pem`);
-    fs.writeFileSync(privateKeyPath, privateKeyPem);
-
-    const publicKeyPath = path.join(tempDir, `public-key.pem`);
-    fs.writeFileSync(publicKeyPath, publicKeyPem);
-
-    // 🔹 3. Tạo CSR (Certificate Signing Request)
-    const csrPath = path.join(tempDir, `csr.pem`);
-    execSync(
-      `openssl req -new -key ${privateKeyPath} -out ${csrPath} -subj "/C=US/ST=CA/L=SanFrancisco/O=MyCompany/OU=IT/CN=user-${userId}"`
-    );
-
-    // 🔹 4. Tạo Self-Signed Certificate
-    const certPath = path.join(tempDir, `certificate.pem`);
-    execSync(
-      `openssl x509 -req -days 365 -in ${csrPath} -signkey ${privateKeyPath} -out ${certPath}`
-    );
-
-    // 🔹 5. Tạo file `.pfx`
-    const pfxPath = path.join(tempDir, `certificate.pfx`);
-    execSync(
-      `openssl pkcs12 -export -out ${pfxPath} -inkey ${privateKeyPath} -in ${certPath} -passout pass:${pfxPassword}`
-    );
-
-    // 🔹 6. Trả về đường dẫn file `.pfx` & password
-    res.json({ pfxPath, pfxPassword });
-  } catch (error) {
-    console.error('Error generating PFX:', error);
-    res.status(500).json({ error: 'Failed to generate PFX' });
-  }
-});
-
-router.get('/generate-file-to-verify', authenticate, async (req, res) => {
-  const tempDir = path.join(__dirname, '../../../frontend/public/verify');
-
-  if (!fs.existsSync(tempDir)) fs.mkdirSync(tempDir);
-
-  try {
-    console.log('req', req.query, req.params);
-
-    const { userId } = req.query;
-
-    const pfxPassword = 'key-password'; // 🔐 Mật khẩu bảo vệ file PFX
-
-    // 🔹 1. Lấy Private Key từ Database
-    const userQuery = await pool.query(
-      'SELECT private_key FROM users WHERE id = $1',
-      [userId]
-    );
-    if (userQuery.rows.length === 0) {
-      return res.status(404).json({ error: 'User not found' });
-    }
-    const privateKeyPem = userQuery.rows[0].private_key;
-
-    // 🔹 2. Lưu Private Key vào file tạm
-    const privateKeyPath = path.join(tempDir, `private-key.pem`);
-    fs.writeFileSync(privateKeyPath, privateKeyPem);
-
-    // 🔹 3. Tạo CSR (Certificate Signing Request)
-    const csrPath = path.join(tempDir, `csr.pem`);
-    execSync(
-      `openssl req -new -key ${privateKeyPath} -out ${csrPath} -subj "/C=US/ST=CA/L=SanFrancisco/O=MyCompany/OU=IT/CN=user-${userId}"`
-    );
-
-    // 🔹 4. Tạo Self-Signed Certificate
-    const certPath = path.join(tempDir, `certificate.pem`);
-    execSync(
-      `openssl x509 -req -days 365 -in ${csrPath} -signkey ${privateKeyPath} -out ${certPath}`
-    );
-
-    // 🔹 5. Tạo file `.pfx`
-    const pfxPath = path.join(tempDir, `certificate.pfx`);
-    execSync(
-      `openssl pkcs12 -export -out ${pfxPath} -inkey ${privateKeyPath} -in ${certPath} -passout pass:${pfxPassword}`
-    );
-
-    // 🔹 6. Trả về đường dẫn file `.pfx` & password
-    res.json({ pfxPath, pfxPassword });
-  } catch (error) {
-    console.error('Error generating PFX:', error);
-    res.status(500).json({ error: 'Failed to generate PFX' });
-  }
-});
-
-router.post('/delete-temp-files', authenticate, async (req, res) => {
-  const frontendPublicPath = path.join(__dirname, '../../../frontend/public');
-
-  try {
-    // 🔹 Xóa file `.pfx`, Private Key, CSR & Certificate
-    const filesToDelete = [
-      `certificate.pfx`,
-      `private-key.pem`,
-      `csr.pem`,
-      `certificate.pem`,
-    ];
-
-    filesToDelete.forEach((file) => {
-      const filePath = path.join(frontendPublicPath, file);
-      if (fs.existsSync(filePath)) {
-        fs.unlinkSync(filePath);
-      }
-    });
-
-    res.json({ message: 'Temporary files deleted successfully' });
-  } catch (error) {
-    console.error('Error deleting temp files:', error);
-    res.status(500).json({ error: 'Failed to delete temp files' });
-  }
-});
-
+//API lưu file đã ký
 router.post(
   '/save-signed-file',
   authenticate,
@@ -321,6 +97,7 @@ router.post(
   }
 );
 
+// API thống kê file ký theo thời gian
 router.get('/statics', authenticate, async (req, res) => {
   try {
     const userId = req.user.id;
@@ -387,7 +164,8 @@ router.get('/statics', authenticate, async (req, res) => {
   }
 });
 
-router.get('/total-signatures', async (req, res) => {
+// API tổng file ký của người dùng
+router.get('/total-signatures', authenticate, async (req, res) => {
   try {
     const userId = req.user.id;
 
@@ -407,8 +185,23 @@ router.get('/total-signatures', async (req, res) => {
   }
 });
 
-// API lấy danh sách file đã ký trong 7 ngày gần nhất
-router.get('/recent-files', async (req, res) => {
+// API tổng file ký của hệ thống
+router.get('/total-signatures-all', authenticate, async (req, res) => {
+  try {
+    const result = await pool.query(
+      `SELECT COUNT(*) AS total FROM signed_files`,
+      []
+    );
+
+    res.json({ total: parseInt(result.rows[0].total) });
+  } catch (error) {
+    console.error('Lỗi khi lấy tổng số lượt ký:', error);
+    res.status(500).json({ error: 'Lỗi khi lấy tổng số lượt ký!' });
+  }
+});
+
+// API lấy danh sách file đã ký của người dùng trong 7 ngày gần nhất
+router.get('/recent-files', authenticate, async (req, res) => {
   try {
     const userId = req.user.id;
 
@@ -422,6 +215,24 @@ router.get('/recent-files', async (req, res) => {
        WHERE user_id = $1 AND signed_at >= NOW() - INTERVAL '7 days'
        ORDER BY signed_at DESC`,
       [userId]
+    );
+
+    res.json({ files: result.rows });
+  } catch (error) {
+    console.error('Lỗi khi lấy danh sách file gần đây:', error);
+    res.status(500).json({ error: 'Lỗi khi lấy danh sách file!' });
+  }
+});
+
+// API lấy danh sách file đã ký của hệ thống trong 7 ngày gần nhất
+router.get('/recent-files-all', authenticate, async (req, res) => {
+  try {
+    const result = await pool.query(
+      `SELECT id, file_name, signed_at 
+       FROM signed_files 
+       WHERE signed_at >= NOW() - INTERVAL '7 days'
+       ORDER BY signed_at DESC`,
+      []
     );
 
     res.json({ files: result.rows });

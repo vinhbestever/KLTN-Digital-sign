@@ -14,10 +14,14 @@ import { Members } from './pages/Members/Members';
 import { History } from './pages/HIstory/History';
 import { Dashboard } from './pages/Dashboard/Dashboard';
 import { Profile } from './pages/Profile/Profile';
+import { useUser } from './context/UserContext';
+import { AccessDenied } from './pages/AccessDenied/AccessDenied';
 
 const App = () => {
   const isAuthenticated = !!localStorage.getItem('token');
 
+  const { user } = useUser();
+  
   return (
     <Router>
       <div className="flex flex-col h-full overflow-hidden">
@@ -62,7 +66,7 @@ const App = () => {
               <Route
                 path="/members"
                 element={
-                  isAuthenticated ? <Members /> : <Navigate to="/login" />
+                  isAuthenticated ? user?.role === 'admin' ? <Members /> : <AccessDenied /> : <Navigate to="/login" />
                 }
               />
 

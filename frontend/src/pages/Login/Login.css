@@ -103,7 +103,6 @@
   --insta-color: #e1306c;
 }
 
-@import url('https://fonts.googleapis.com/css2?family=Poppins:wght@200;300;400;500;600&display=swap');
 .container-login {
   position: relative;
   min-height: 100vh;
@@ -280,7 +279,7 @@
 
 .text {
   margin: 4rem;
-  color: var(--white);
+  color: #f4f4f4;
 }
 
 .text h2 {

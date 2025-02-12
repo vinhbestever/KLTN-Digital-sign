@@ -2,21 +2,17 @@
 import './SideBar.css';
 import { Avatar } from 'antd';
 import { LogoutOutlined, UserOutlined } from '@ant-design/icons';
-import axiosInstance from '../../api/axiosConfig';
 import { Link, useLocation } from 'react-router-dom';
 import { useUser } from '../../context/UserContext';
 const Sidebar = () => {
   const { user } = useUser();
   const location = useLocation();
   const handleLogout = async () => {
-    const res = await axiosInstance.post('/api/files/delete-temp-files');
 
-    if (res) {
       localStorage.removeItem('token');
       localStorage.removeItem('refreshToken');
 
       window.location.href = '/login';
-    }
   };
 
   return (
@@ -66,13 +62,15 @@ const Sidebar = () => {
             <i className="fa fa-star-o" aria-hidden="true"></i>
             Kiểm tra chữ ký
           </Link>
-          <Link
-            to="/members"
-            className={location.pathname === '/members' ? 'active' : ''}
-          >
-            <i className="fa fa-clone" aria-hidden="true"></i>
-            Thành viên
-          </Link>
+          {user?.role === 'admin' &&
+            <Link
+              to="/members"
+              className={location.pathname === '/members' ? 'active' : ''}
+            >
+              <i className="fa fa-clone" aria-hidden="true"></i>
+              Thành viên
+            </Link>
+          }
           <Link
             to="/history"
             className={location.pathname === '/history' ? 'active' : ''}
