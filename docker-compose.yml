@@ -1,0 +1,38 @@
+version: '3.8'
+
+services:
+  database:
+    image: postgres:14
+    container_name: digital_sign_db
+    restart: always
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: your_password
+      POSTGRES_DB: digital_signature
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+
+  backend:
+    build: ./backend
+    container_name: digital_sign_backend
+    restart: always
+    depends_on:
+      - database
+    environment:
+      DATABASE_URL: postgresql://digital_user:digital_password@database:5432/digital_signature
+    ports:
+      - "5001:5001"
+
+  frontend:
+    build: ./frontend
+    container_name: digital_sign_frontend
+    restart: always
+    depends_on:
+      - backend
+    ports:
+      - "80:80"
+
+volumes:
+  pgdata:
