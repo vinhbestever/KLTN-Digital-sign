@@ -22,15 +22,15 @@ router.get('/user', authenticate, async (req, res) => {
 
     const user = userQuery.rows[0];
 
-    const avatarUrl = user.avatar
-      ? `/api/avatar/${userId}`
-      : '/default-avatar.png';
+    // const avatarUrl = user.avatar
+    //   ? `/api/user/avatar/${userId}`
+    //   : '/default-avatar.png';
 
     res.json({
       id: user.id,
       name: user.name,
       email: user.email,
-      avatar: avatarUrl,
+      avatar: `data:image/png;base64,${user.avatar}`,
       phone: user.phone,
       address: user.address,
       gender: user.gender,
@@ -93,20 +93,8 @@ router.put('/user', authenticate, upload.single('avatar'), async (req, res) => {
   }
 });
 
-router.delete('/user', authenticate, async (req, res) => {
-  try {
-    const userId = req.user.id;
-    await pool.query('DELETE FROM users WHERE id = $1', [userId]);
-
-    res.json({ message: 'Tài khoản đã bị xóa thành công!' });
-  } catch (error) {
-    console.error('Lỗi khi xóa user:', error);
-    res.status(500).json({ error: 'Xóa tài khoản thất bại!' });
-  }
-});
-
 // API avatar người dùng
-router.get('/avatar/:userId', authenticate, async (req, res) => {
+router.get('/avatar/:userId', async (req, res) => {
   try {
     const { userId } = req.params;
     const avatarQuery = await pool.query(
@@ -248,4 +236,28 @@ router.delete('/users/:id', authenticate, async (req, res) => {
     res.status(500).json({ error: 'Lỗi khi xóa user!' });
   }
 });
+
+// API cập nhật Avatar
+router.post(
+  '/user/:userId/avatar',
+  authenticate,
+  upload.single('avatar'),
+  async (req, res) => {
+    try {
+      const userId = req.params.userId;
+      const avatarBuffer = req.file.buffer;
+      const avatarBase64 = avatarBuffer.toString('base64');
+
+      await pool.query('UPDATE users SET avatar = $1 WHERE id = $2', [
+        avatarBase64,
+        userId,
+      ]);
+
+      res.json({ avatarUrl: `data:image/png;base64,${avatarBase64}` });
+    } catch (error) {
+      console.error('Lỗi khi cập nhật avatar:', error);
+      res.status(500).json({ error: 'Lỗi khi cập nhật avatar!' });
+    }
+  }
+);
 module.exports = router;

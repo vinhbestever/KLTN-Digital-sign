@@ -1,19 +1,26 @@
 import { Table } from 'antd';
 import { useEffect, useState } from 'react';
 import axiosInstance from '../../api/axiosConfig';
+import { useUser } from '../../context/UserContext';
 
 const TableSign = () => {
   const [files, setFiles] = useState([]);
   const [loading, setLoading] = useState(false);
 
+  const { user } = useUser();
+
   useEffect(() => {
-    fetchRecentSignedFiles();
-  }, []);
+    if (user) {
+      fetchRecentSignedFiles();
+    }
+  }, [user]);
 
   const fetchRecentSignedFiles = async () => {
     setLoading(true);
     try {
-      const response = await axiosInstance.get(`/api/files/recent-files`);
+      const response = await axiosInstance.get(
+        `/api/files/recent-files${user?.role === 'admin' ? '-all' : ''}`
+      );
       setFiles(response.data.files);
     } catch (error) {
       console.error('Lỗi khi lấy file gần đây:', error);

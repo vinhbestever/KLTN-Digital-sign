@@ -3,17 +3,23 @@ import axiosInstance from '../../api/axiosConfig';
 import { useEffect, useState } from 'react';
 import StatsChart from './StatsChart';
 import TableSign from './TableSign';
+import { useUser } from '../../context/UserContext';
 
 export const Dashboard = () => {
   const [totalSignatures, setTotalSignatures] = useState(0);
+  const { user } = useUser();
 
   useEffect(() => {
-    fetchTotalSignatures();
-  }, []);
+    if (user) {
+      fetchTotalSignatures();
+    }
+  }, [user]);
 
   const fetchTotalSignatures = async () => {
     try {
-      const response = await axiosInstance.get('api/files/total-signatures');
+      const response = await axiosInstance.get(
+        `api/files/total-signatures${user?.role === 'admin' ? '-all' : ''}`
+      );
       setTotalSignatures(response.data.total);
     } catch (error) {
       console.error('Lỗi khi lấy tổng số lượt ký:', error);

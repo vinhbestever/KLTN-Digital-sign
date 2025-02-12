@@ -2,12 +2,11 @@ const express = require('express');
 const multer = require('multer');
 const pool = require('../database');
 const router = express.Router();
-const upload = multer({ storage: multer.memoryStorage() }); 
+const upload = multer({ storage: multer.memoryStorage() });
 const authenticate = require('../middleware/authenticate');
 
-
-// API để lấy danh sách file đã ký
-router.get('/signed-files', authenticate, async (req, res) => {
+// API để lấy danh sách file đã ký trên hệ thống
+router.get('/signed-files-all', authenticate, async (req, res) => {
   try {
     const {
       search = '',
@@ -27,6 +26,51 @@ router.get('/signed-files', authenticate, async (req, res) => {
 
     if (startDate && endDate) {
       query += ` AND signed_at BETWEEN $2 AND $3`;
+      queryParams.push(startDate, endDate);
+    }
+
+    query += ` ORDER BY signed_at DESC LIMIT $${
+      queryParams.length + 1
+    } OFFSET $${queryParams.length + 2}`;
+    queryParams.push(pageSize, offset);
+
+    const files = await pool.query(query, queryParams);
+    const total = await pool.query(
+      `SELECT COUNT(*) FROM signed_files WHERE file_name ILIKE $1`,
+      [`%${search}%`]
+    );
+
+    res.json({ files: files.rows, total: parseInt(total.rows[0].count) });
+  } catch (error) {
+    console.error('Lỗi khi lấy danh sách file đã ký:', error);
+    res.status(500).json({ error: 'Lỗi khi lấy danh sách file đã ký!' });
+  }
+});
+
+// API để lấy danh sách file đã ký trên hệ thống
+router.get('/signed-files', authenticate, async (req, res) => {
+  try {
+    const {
+      search = '',
+      startDate,
+      endDate,
+      page = 1,
+      pageSize = 10,
+    } = req.query;
+
+    const userId = req.user.id;
+
+    const offset = (page - 1) * pageSize;
+
+    let query = `
+      SELECT id, file_name, signed_at 
+      FROM signed_files 
+      WHERE user_id = $1 AND file_name ILIKE $2`;
+
+    let queryParams = [userId, `%${search}%`];
+
+    if (startDate && endDate) {
+      query += ` AND signed_at BETWEEN $3 AND $4`;
       queryParams.push(startDate, endDate);
     }
 
@@ -97,7 +141,7 @@ router.post(
   }
 );
 
-// API thống kê file ký theo thời gian
+// API thống kê file ký theo thời gian cho từng user
 router.get('/statics', authenticate, async (req, res) => {
   try {
     const userId = req.user.id;
@@ -147,6 +191,68 @@ router.get('/statics', authenticate, async (req, res) => {
           SELECT TO_CHAR(signed_at, 'YYYY-MM') AS period, COUNT(*) AS total_files
           FROM signed_files
           WHERE user_id = $1 AND signed_at BETWEEN $2 AND $3
+          GROUP BY period
+          ORDER BY period ASC
+        `;
+        break;
+
+      default:
+        return res.status(400).json({ error: 'Khoảng thời gian không hợp lệ' });
+    }
+
+    const result = await pool.query(query, queryParams);
+    res.json(result.rows);
+  } catch (error) {
+    console.error('Lỗi khi lấy thống kê file đã ký:', error);
+    res.status(500).json({ error: 'Lỗi khi lấy thống kê!' });
+  }
+});
+
+// API thống kê file ký theo thời gian cho toàn bộ hệ thống
+router.get('/statics-all', authenticate, async (req, res) => {
+  try {
+    const { rangeType, startDate, endDate } = req.query;
+
+    let query;
+    let queryParams = [startDate, endDate];
+
+    switch (rangeType) {
+      case 'today':
+      case 'yesterday':
+      case 'custom':
+        query = `
+          SELECT 'Total' AS period, COUNT(*) AS total_files
+          FROM signed_files
+          WHERE signed_at BETWEEN $1 AND $2
+        `;
+        break;
+
+      case 'last7days':
+        query = `
+          SELECT TO_CHAR(signed_at, 'YYYY-MM-DD') AS period, COUNT(*) AS total_files
+          FROM signed_files
+          WHERE signed_at BETWEEN $1 AND $2
+          GROUP BY period
+          ORDER BY period ASC
+        `;
+        break;
+
+      case 'thisMonth':
+      case 'lastMonth':
+        query = `
+          SELECT TO_CHAR(signed_at, 'YYYY-"Week"W') AS period, COUNT(*) AS total_files
+          FROM signed_files
+          WHERE signed_at BETWEEN $1 AND $2
+          GROUP BY period
+          ORDER BY period ASC
+        `;
+        break;
+
+      case 'thisYear':
+        query = `
+          SELECT TO_CHAR(signed_at, 'YYYY-MM') AS period, COUNT(*) AS total_files
+          FROM signed_files
+          WHERE signed_at BETWEEN $1 AND $2
           GROUP BY period
           ORDER BY period ASC
         `;
@@ -239,6 +345,48 @@ router.get('/recent-files-all', authenticate, async (req, res) => {
   } catch (error) {
     console.error('Lỗi khi lấy danh sách file gần đây:', error);
     res.status(500).json({ error: 'Lỗi khi lấy danh sách file!' });
+  }
+});
+
+router.get('/signed-files-export', authenticate, async (req, res) => {
+  try {
+    const { startDate, endDate } = req.query;
+    const userId = req.user.id;
+
+    const query = `
+      SELECT id, file_name, signed_at
+      FROM signed_files
+      WHERE user_id = $1
+      AND signed_at BETWEEN $2 AND $3
+      ORDER BY signed_at DESC
+    `;
+
+    const result = await pool.query(query, [userId, startDate, endDate]);
+
+    res.json({ files: result.rows });
+  } catch (error) {
+    console.error('Lỗi khi lấy dữ liệu xuất báo cáo:', error);
+    res.status(500).json({ error: 'Lỗi khi lấy dữ liệu!' });
+  }
+});
+
+router.get('/signed-files-export-all', authenticate, async (req, res) => {
+  try {
+    const { startDate, endDate } = req.query;
+
+    const query = `
+      SELECT id, file_name, signed_at
+      FROM signed_files
+      WHERE signed_at BETWEEN $1 AND $2
+      ORDER BY signed_at DESC
+    `;
+
+    const result = await pool.query(query, [startDate, endDate]);
+
+    res.json({ files: result.rows });
+  } catch (error) {
+    console.error('Lỗi khi lấy dữ liệu xuất báo cáo:', error);
+    res.status(500).json({ error: 'Lỗi khi lấy dữ liệu!' });
   }
 });
 module.exports = router;

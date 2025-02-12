@@ -15,6 +15,7 @@ import React, { useEffect, useState } from 'react';
 import { useUser } from '../../context/UserContext';
 import dayjs from 'dayjs';
 import axiosInstance from '../../api/axiosConfig';
+import AvatarUpload from '../../components/AvatarUpload/AvatarUpload';
 
 interface SubmitButtonProps {
   form: FormInstance;
@@ -103,7 +104,12 @@ export const Profile = () => {
       <div className="w-full h-full flex gap-[20px]">
         <div className="w-[370px] min-w-[370px] h-fit bg-white rounded-lg shadow-lg flex flex-col overflow-hidden gap-[42px] p-[18px]">
           <div className="flex flex-col items-center gap-[16px] w-full">
-            <Avatar src={user?.avatar} size={100} icon={<UserOutlined />} />
+            {/* <Avatar src={user?.avatar} size={100} icon={<UserOutlined />} /> */}
+            <AvatarUpload
+              avatarUrl={user?.avatar}
+              userId={user?.id}
+              refresh={refreshUser}
+            />
             <div className="text-[18px] font-medium"> {user?.name} </div>
 
             {/* <Button>Dổi ảnh đại diện</Button> */}

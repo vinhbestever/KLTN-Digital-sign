@@ -27,6 +27,7 @@ import { useEffect, useState } from 'react';
 import axiosInstance from '../../api/axiosConfig';
 import dayjs from 'dayjs';
 import isoWeek from 'dayjs/plugin/isoWeek';
+import { useUser } from '../../context/UserContext';
 
 dayjs.extend(isoWeek);
 
@@ -38,16 +39,23 @@ const StatsChart = () => {
   const [rangeType, setRangeType] = useState('today');
   const [customRange, setCustomRange] = useState([]);
 
+  const { user } = useUser();
+
   useEffect(() => {
-    fetchStats();
-  }, [rangeType, customRange]);
+    if (user) {
+      fetchStats();
+    }
+  }, [user, rangeType, customRange]);
 
   const fetchStats = async () => {
     try {
       const { startDate, endDate } = getDateRange(rangeType);
-      const response = await axiosInstance.get(`api/files/statics`, {
-        params: { startDate, endDate, rangeType },
-      });
+      const response = await axiosInstance.get(
+        `api/files/statics${user?.role === 'admin' ? '-all' : ''}`,
+        {
+          params: { startDate, endDate, rangeType },
+        }
+      );
 
       const data = response.data;
 
