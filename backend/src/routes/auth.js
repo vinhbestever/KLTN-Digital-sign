@@ -9,6 +9,8 @@ const path = require('path');
 const fs = require('fs');
 const { execSync } = require('child_process');
 
+const authenticate = require('../middleware/authenticate');
+
 require('dotenv').config();
 
 // Hàm tạo Access Token
@@ -25,6 +27,9 @@ const createRefreshToken = (user) => {
   });
 };
 
+const generateOTP = () => {
+  return crypto.randomInt(100000, 999999).toString();
+};
 // Gửi email qua NodeMailer
 const transporter = nodemailer.createTransport({
   service: 'Gmail',
@@ -40,14 +45,14 @@ const generateNextUserId = async () => {
     "SELECT MAX(id) AS max_id FROM users WHERE id LIKE 'A%'"
   );
 
-  let nextNumber = 1; 
+  let nextNumber = 1;
   if (result.rows[0].max_id) {
-    const lastId = result.rows[0].max_id; 
-    const lastNumber = parseInt(lastId.slice(1), 10); 
+    const lastId = result.rows[0].max_id;
+    const lastNumber = parseInt(lastId.slice(1), 10);
     nextNumber = lastNumber + 1;
   }
 
-  return `A${String(nextNumber).padStart(5, '0')}`; 
+  return `A${String(nextNumber).padStart(5, '0')}`;
 };
 
 // API Đăng ký
@@ -63,17 +68,28 @@ router.post('/register', async (req, res) => {
 
       if (!user.is_verified) {
         const otp = generateOTP();
-        const otpExpiration = dayjs().add(5, 'minute').toISOString();
+        const otpExpiration = new Date(Date.now() + 5 * 60 * 1000);
 
-        await pool.query('UPDATE users SET otp_code = $1, otp_expiration = $2 WHERE email = $3', [
-          otp,
-          otpExpiration,
-          email,
-        ]);
+        await pool.query(
+          'UPDATE users SET otp_code = $1, otp_expiration = $2 WHERE email = $3',
+          [otp, otpExpiration, email]
+        );
 
-        await sendOTPEmail(email, otp);
+        await pool.query(
+          `UPDATE users SET otp_code = $1, otp_expiration = $2 WHERE email = $3`,
+          [otp, otpExpiration, email]
+        );
 
-        return res.status(200).json({ message: 'OTP sent to email' });
+        const mailOptions = {
+          from: process.env.EMAIL_USER,
+          to: email,
+          subject: 'Mã OTP Xác Thực Tài Khoản',
+          text: `Mã OTP của bạn là: ${otp}. Mã sẽ hết hạn sau 5 phút.`,
+        };
+
+        await transporter.sendMail(mailOptions);
+
+        res.json({ message: 'OTP mới đã được gửi đến email của bạn!' });
       }
 
       return res.status(400).json({ error: 'Email đã được đăng ký.' });
@@ -99,8 +115,6 @@ router.post('/register', async (req, res) => {
       `openssl pkcs12 -export -out ${pfxPath} -inkey ${privateKeyPath} -in ${certificatePath} -passout pass:${pfxPassword}`
     );
 
-    const userId = await generateNextUserId();
-
     const publicKey = fs.readFileSync(certificatePath, 'utf8');
     const privateKey = fs.readFileSync(pfxPath);
 
@@ -110,9 +124,72 @@ router.post('/register', async (req, res) => {
     const otpExpiration = new Date(Date.now() + 5 * 60 * 1000);
 
     await pool.query(
-      'INSERT INTO users (id, email, name, password_hash, otp_code, otp_expiration, public_key, private_key) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)',
+      'INSERT INTO users (email, name, password_hash, otp_code, otp_expiration, public_key, private_key) VALUES ($1, $2, $3, $4, $5, $6, $7)',
+      [email, name, passwordHash, otpCode, otpExpiration, publicKey, privateKey]
+    );
+
+    await transporter.sendMail({
+      from: process.env.EMAIL_USER,
+      to: email,
+      subject: 'Mã OTP Xác Thực Tài Khoản',
+      text: `Mã OTP của bạn là: ${otpCode}. Mã sẽ hết hạn sau 5 phút.`,
+    });
+
+    fs.unlinkSync(privateKeyPath);
+    fs.unlinkSync(csrPath);
+    fs.unlinkSync(certificatePath);
+    fs.unlinkSync(pfxPath);
+
+    res.status(200).json({ message: 'OTP sent to email' });
+  } catch (error) {
+    console.error('Error during registration:', error);
+    res.status(500).json({ error: 'Registration failed' });
+  }
+});
+
+// API tạo tài khoản
+router.post('/create-account', authenticate, async (req, res) => {
+  const { email, password, name, role } = req.body;
+
+  try {
+    const userQuery = await pool.query('SELECT * FROM users WHERE email = $1', [
+      email,
+    ]);
+    if (userQuery.rows.length > 0) {
+      return res.status(400).json({ error: 'Email đã được đăng ký.' });
+    }
+
+    const tempDir = path.join(__dirname, '../temp');
+    if (!fs.existsSync(tempDir)) fs.mkdirSync(tempDir);
+
+    const privateKeyPath = path.join(tempDir, 'private-key.pem');
+    const csrPath = path.join(tempDir, 'csr.pem');
+    const certificatePath = path.join(tempDir, 'certificate.pem');
+    const pfxPath = path.join(tempDir, 'certificate.pfx');
+    const pfxPassword = 'key-password';
+
+    execSync(`openssl genpkey -algorithm RSA -out ${privateKeyPath}`);
+    execSync(
+      `openssl req -new -key ${privateKeyPath} -out ${csrPath} -subj "/CN=${email}"`
+    );
+    execSync(
+      `openssl x509 -req -days 365 -in ${csrPath} -signkey ${privateKeyPath} -out ${certificatePath}`
+    );
+    execSync(
+      `openssl pkcs12 -export -out ${pfxPath} -inkey ${privateKeyPath} -in ${certificatePath} -passout pass:${pfxPassword}`
+    );
+
+    const publicKey = fs.readFileSync(certificatePath, 'utf8');
+    const privateKey = fs.readFileSync(pfxPath);
+
+    const passwordHash = await bcrypt.hash(password, 10);
+
+    const otpCode = null;
+    const otpExpiration = null;
+
+    await pool.query(
+      'INSERT INTO users (email, name, password_hash, otp_code, otp_expiration, public_key, private_key, is_verified, role) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)',
       [
-        userId,
         email,
         name,
         passwordHash,
@@ -120,15 +197,10 @@ router.post('/register', async (req, res) => {
         otpExpiration,
         publicKey,
         privateKey,
+        true,
+        role,
       ]
     );
-
-    await transporter.sendMail({
-      from: process.env.EMAIL_USER,
-      to: email,
-      subject: 'Mã OTP Xác Thực Tài Khoản',
-      text: `Mã OTP của bạn là: ${newOTP}. Mã sẽ hết hạn sau 5 phút.`,
-    });
 
     fs.unlinkSync(privateKeyPath);
     fs.unlinkSync(csrPath);
@@ -268,7 +340,7 @@ router.post('/refresh-token', (req, res) => {
 });
 
 // API lấy khoá của người dùng
-router.get('/get-key/:userId/:fileType', async (req, res) => {
+router.get('/get-key/:userId/:fileType', authenticate, async (req, res) => {
   try {
     const { userId, fileType } = req.params;
 
@@ -323,7 +395,7 @@ router.post('/resend-otp', async (req, res) => {
     }
 
     const newOTP = generateOTP();
-    const otpExpiration = new Date(Date.now() + 5 * 60 * 1000); 
+    const otpExpiration = new Date(Date.now() + 5 * 60 * 1000);
 
     await pool.query(
       `UPDATE users SET otp_code = $1, otp_expiration = $2 WHERE email = $3`,

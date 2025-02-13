@@ -30,7 +30,7 @@ router.get('/user', authenticate, async (req, res) => {
       id: user.id,
       name: user.name,
       email: user.email,
-      avatar: `data:image/png;base64,${user.avatar}`,
+      avatar: user.avatar ? `data:image/png;base64,${user.avatar}` : null,
       phone: user.phone,
       address: user.address,
       gender: user.gender,
@@ -142,7 +142,15 @@ router.get('/users', authenticate, async (req, res) => {
       [`%${search}%`]
     );
 
-    res.json({ users: users.rows, total: parseInt(total.rows[0].count) });
+    const usersWithBase64Avatars = users.rows.map((user) => ({
+      ...user,
+      avatar: user.avatar ? `data:image/png;base64,${user.avatar}` : null, // Nếu không có avatar thì trả về null
+    }));
+
+    res.json({
+      users: usersWithBase64Avatars,
+      total: parseInt(total.rows[0].count),
+    });
   } catch (error) {
     console.error('Lỗi khi lấy danh sách user:', error);
     res.status(500).json({ error: 'Lỗi khi lấy danh sách user!' });

@@ -14,6 +14,7 @@ import {
 import { useEffect, useState } from 'react';
 import axiosInstance from '../../api/axiosConfig';
 import dayjs from 'dayjs';
+import { PlusOutlined, UserOutlined } from '@ant-design/icons';
 
 const { Search } = Input;
 const { Option } = Select;
@@ -27,7 +28,9 @@ export const Members = () => {
   const [searchTerm, setSearchTerm] = useState('');
 
   const [form] = Form.useForm();
+  const [form2] = Form.useForm();
   const [isModalVisible, setIsModalVisible] = useState(false);
+  const [isModalCreateVisible, setIsModalCreateVisible] = useState(false);
   const [currentUser, setCurrentUser] = useState(null);
 
   useEffect(() => {
@@ -80,12 +83,26 @@ export const Members = () => {
     }
   };
 
+  const handleSubmitCreate = async (values) => {
+    try {
+      await axiosInstance.post(`api/auth/create-account`, values);
+      message.success('Tạo tài khoản thành công!');
+      fetchUsers();
+      setIsModalCreateVisible(false);
+      form.resetFields();
+    } catch (error) {
+      message.error('Lỗi tạo tài khoản!');
+    }
+  };
+
   const columns = [
     {
       title: 'Avatar',
       dataIndex: 'avatar',
       key: 'avatar',
-      render: (avatar: string) => <Avatar src={avatar} />,
+      render: (avatar: string) => (
+        <Avatar src={avatar} icon={<UserOutlined />} />
+      ),
     },
     {
       title: 'Tên User',
@@ -163,8 +180,15 @@ export const Members = () => {
     <div className="p-[32px] flex flex-col w-full h-full gap-[18px]">
       <div className="text-[22px] font-medium">Quản lý thành viên</div>
       <div className="w-full h-full bg-white rounded-lg shadow-lg flex flex-col items-center p-[20px] overflow-auto gap-[18px]">
-        <div className="w-full flex items-center gap-[10px]">
+        <div className="w-full flex items-center gap-[10px] justify-between">
           <div className="text-[16px]">Danh sách thành viên</div>
+          <Button
+            onClick={() => setIsModalCreateVisible(true)}
+            icon={<PlusOutlined />}
+            type="primary"
+          >
+            Thêm người dùng mới
+          </Button>
         </div>
 
         <div className="flex flex-col w-full h-full gap-[18px]">
@@ -194,6 +218,45 @@ export const Members = () => {
           />
         </div>
       </div>
+      <Modal
+        open={isModalCreateVisible}
+        title="Chỉnh sửa Thông tin tài khoản"
+        onCancel={() => setIsModalCreateVisible(false)}
+        footer={
+          <div className="flex items-center w-full justify-end gap-[12px]">
+            <Button onClick={() => setIsModalCreateVisible(false)}>Huỷ</Button>
+            <Button type="primary" onClick={() => form2.submit()}>
+              Lưu
+            </Button>
+          </div>
+        }
+      >
+        <Form form={form2} layout="vertical" onFinish={handleSubmitCreate}>
+          <Form.Item name="name" label="Họ và tên" rules={[{ required: true }]}>
+            <Input />
+          </Form.Item>
+          <Form.Item name="email" label="Email" rules={[{ required: true }]}>
+            <Input type="email" />
+          </Form.Item>
+          <Form.Item
+            name="password"
+            label="Mật khẩu"
+            rules={[{ required: true }]}
+          >
+            <Input type="password" />
+          </Form.Item>
+          <Form.Item
+            name="role"
+            label="Loại tài khoản"
+            rules={[{ required: true }]}
+          >
+            <Select>
+              <Option value="admin">Quản Lý</Option>
+              <Option value="user">Người Dùng</Option>
+            </Select>
+          </Form.Item>
+        </Form>
+      </Modal>
       <Modal
         open={isModalVisible}
         title="Chỉnh sửa Thông tin tài khoản"

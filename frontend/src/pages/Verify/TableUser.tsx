@@ -1,6 +1,7 @@
 import { Avatar, Input, Table } from 'antd';
 import { useEffect, useState } from 'react';
 import axiosInstance from '../../api/axiosConfig';
+import { UserOutlined } from '@ant-design/icons';
 
 const { Search } = Input;
 
@@ -36,7 +37,9 @@ export const TableUser = ({ setUserVerify }) => {
       title: 'Avatar',
       dataIndex: 'avatar',
       key: 'avatar',
-      render: (avatar: string) => <Avatar src={avatar} />,
+      render: (avatar: string) => (
+        <Avatar src={avatar} icon={<UserOutlined />} />
+      ),
     },
     {
       title: 'Tên User',

@@ -8,11 +8,10 @@ const Sidebar = () => {
   const { user } = useUser();
   const location = useLocation();
   const handleLogout = async () => {
+    localStorage.removeItem('token');
+    localStorage.removeItem('refreshToken');
 
-      localStorage.removeItem('token');
-      localStorage.removeItem('refreshToken');
-
-      window.location.href = '/login';
+    window.location.href = '/login';
   };
 
   return (
@@ -62,7 +61,7 @@ const Sidebar = () => {
             <i className="fa fa-star-o" aria-hidden="true"></i>
             Kiểm tra chữ ký
           </Link>
-          {user?.role === 'admin' &&
+          {user?.role === 'admin' && (
             <Link
               to="/members"
               className={location.pathname === '/members' ? 'active' : ''}
@@ -70,7 +69,7 @@ const Sidebar = () => {
               <i className="fa fa-clone" aria-hidden="true"></i>
               Thành viên
             </Link>
-          }
+          )}
           <Link
             to="/history"
             className={location.pathname === '/history' ? 'active' : ''}
