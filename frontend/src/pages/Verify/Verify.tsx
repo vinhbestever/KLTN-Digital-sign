@@ -93,8 +93,8 @@ export const Verify = () => {
     WebViewer(
       {
         path: '/webviewer/lib',
-        licenseKey:
-          'demo:1738134661579:7e96ae3803000000002af4ccc4d7039aebd9699379b2679c5a49147ffc',
+        // licenseKey:
+        //   'demo:1738134661579:7e96ae3803000000002af4ccc4d7039aebd9699379b2679c5a49147ffc',
         fullAPI: true,
       },
       viewer.current
@@ -173,7 +173,7 @@ export const Verify = () => {
             <Steps items={renderStep()} />
           </div>
           {step === 1 && (
-            <div className="w-full h-full flex flex-col items-center justify-between">
+            <div className="w-full h-full flex flex-col items-center justify-between overflow-y-auto">
               <TableUser setUserVerify={setUserVerify} />
               <Button
                 disabled={!userVerify}
@@ -185,7 +185,7 @@ export const Verify = () => {
             </div>
           )}
           {step === 2 && (
-            <div className="w-full h-full flex flex-col items-center justify-between">
+            <div className="w-full h-full flex flex-col items-center justify-between overflow-y-auto">
               <label
                 onClick={() => {
                   if (filePicker) {

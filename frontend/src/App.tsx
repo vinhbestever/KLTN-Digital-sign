@@ -5,7 +5,6 @@ import {
   Navigate,
 } from 'react-router-dom';
 import './App.css';
-import Register from './components/Register';
 import Login from './pages/Login/Login';
 import Sidebar from './components/SideBar/SideBar';
 import { Sign } from './pages/Sign/Sign';
@@ -21,7 +20,7 @@ const App = () => {
   const isAuthenticated = !!localStorage.getItem('token');
 
   const { user } = useUser();
-  
+
   return (
     <Router>
       <div className="flex flex-col h-full overflow-hidden">
@@ -39,12 +38,7 @@ const App = () => {
                   isAuthenticated ? <Navigate to="/dashboard" /> : <Login />
                 }
               />
-              <Route
-                path="/register"
-                element={
-                  isAuthenticated ? <Navigate to="/dashboard" /> : <Register />
-                }
-              />
+
               <Route
                 path="/dashboard"
                 element={
@@ -66,7 +60,15 @@ const App = () => {
               <Route
                 path="/members"
                 element={
-                  isAuthenticated ? user?.role === 'admin' ? <Members /> : <AccessDenied /> : <Navigate to="/login" />
+                  isAuthenticated ? (
+                    user?.role === 'admin' ? (
+                      <Members />
+                    ) : (
+                      <AccessDenied />
+                    )
+                  ) : (
+                    <Navigate to="/login" />
+                  )
                 }
               />
 

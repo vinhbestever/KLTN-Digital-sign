@@ -189,8 +189,8 @@ export const History = () => {
     },
     {
       title: 'ID người dùng đã ký',
-      dataIndex: 'id',
-      key: 'id',
+      dataIndex: 'user_id',
+      key: 'user_id',
     },
     {
       title: 'Tên người đã ký',

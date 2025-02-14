@@ -63,6 +63,7 @@ const TableSign = () => {
           dataSource={files}
           loading={loading}
           rowKey="id"
+          scroll={{ y: 55 * 4 }}
         />
       </div>
     </div>

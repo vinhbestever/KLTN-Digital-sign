@@ -36,8 +36,8 @@ export const Sign = () => {
     WebViewer(
       {
         path: '/webviewer/lib',
-        licenseKey:
-          'demo:1738134661579:7e96ae3803000000002af4ccc4d7039aebd9699379b2679c5a49147ffc',
+        // licenseKey:
+        //   'demo:1738134661579:7e96ae3803000000002af4ccc4d7039aebd9699379b2679c5a49147ffc',
         fullAPI: true,
       },
       viewer.current
@@ -100,7 +100,6 @@ export const Sign = () => {
     const fdfDoc = await PDFNet.FDFDoc.createFromXFDF(xfdf);
     await doc.fdfMerge(fdfDoc);
     await doc.flattenAnnotations();
-    console.log('xfdf', fdfDoc);
 
     // Run PDFNet methods with memory management
 
@@ -251,7 +250,7 @@ export const Sign = () => {
                     file)
                   </p>
                   <p className="text-sm font-normal text-gray-400">
-                    Định dạng được hỗ trợ [pdf, docx, xlsx, xml, pptx]
+                    Định dạng được hỗ trợ [pdf]
                   </p>
                   <p className="text-sm font-normal text-gray-400">
                     Kích thước hỗ trợ tối đa 20MB

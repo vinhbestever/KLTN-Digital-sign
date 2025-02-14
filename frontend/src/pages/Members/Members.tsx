@@ -215,6 +215,7 @@ export const Members = () => {
                 setPageSize(pageSize);
               },
             }}
+            scroll={{ y: 55 * 8 }}
           />
         </div>
       </div>

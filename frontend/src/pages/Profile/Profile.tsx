@@ -148,7 +148,7 @@ export const Profile = () => {
                 Loại tài khoản
               </div>
               <div className="text-[16px] text-start font-semibold">
-                {user?.role}
+                {user?.role === 'user' ? 'Người dùng' : 'Quản lý'}
               </div>
             </div>
           </div>

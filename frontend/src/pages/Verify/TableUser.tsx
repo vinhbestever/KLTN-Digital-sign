@@ -122,7 +122,7 @@ export const TableUser = ({ setUserVerify }) => {
             setPageSize(pageSize);
           },
         }}
-        scroll={{ y: 55 * 8 }}
+        scroll={{ y: 55 * 7 }}
       />
     </div>
   );

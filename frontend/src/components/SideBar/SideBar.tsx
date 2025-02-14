@@ -27,7 +27,7 @@ const Sidebar = () => {
             <Avatar src={user?.avatar} size="large" icon={<UserOutlined />} />
 
             <div className="flex flex-col">
-              <div className="text-white text-[18px]">{user?.name}</div>
+              <div className="text-white text-[14px">{user?.name}</div>
               <div className="text-white text-[10px] opacity-40">
                 {user?.email}
               </div>

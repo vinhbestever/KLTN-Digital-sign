@@ -23,7 +23,7 @@ const Login = () => {
         email: emailLogin,
         password: passwordLogin,
       });
-      message.info(response.data.message);
+      message.success(response.data.message);
       localStorage.setItem('token', response.data.accessToken);
       localStorage.setItem('refreshToken', response.data.refreshToken);
 
@@ -53,7 +53,9 @@ const Login = () => {
         email,
         otp,
       });
-      alert(response.data.message);
+      message.success(response.data.message);
+      setIsOtpSent(false);
+      toggle();
     } catch (error) {
       message.error(error.response.data.error);
     }
@@ -64,7 +66,7 @@ const Login = () => {
       const response = await axiosInstance.post('/api/auth/forgot-password', {
         email: emailLogin,
       });
-      alert(response.data.message);
+      message.success(response.data.message);
     } catch (error) {
       message.error(error.response.data.error);
     }
