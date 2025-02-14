@@ -18,9 +18,10 @@ router.get('/signed-files-all', authenticate, async (req, res) => {
     const offset = (page - 1) * pageSize;
 
     let query = `
-      SELECT id, file_name, signed_at 
-      FROM signed_files 
-      WHERE file_name ILIKE $1`;
+      SELECT sf.id, sf.file_name, sf.signed_at, sf.user_id, u.name AS user_name 
+      FROM signed_files sf
+      JOIN users u ON sf.user_id = u.id
+      WHERE sf.file_name ILIKE $1`;
 
     let queryParams = [`%${search}%`];
 
@@ -63,9 +64,10 @@ router.get('/signed-files', authenticate, async (req, res) => {
     const offset = (page - 1) * pageSize;
 
     let query = `
-      SELECT id, file_name, signed_at 
-      FROM signed_files 
-      WHERE user_id = $1 AND file_name ILIKE $2`;
+      SELECT sf.id, sf.file_name, sf.signed_at, sf.user_id, u.name AS user_name 
+      FROM signed_files sf
+      JOIN users u ON sf.user_id = u.id
+      WHERE user_id = $1 AND sf.file_name ILIKE $2`;
 
     let queryParams = [userId, `%${search}%`];
 

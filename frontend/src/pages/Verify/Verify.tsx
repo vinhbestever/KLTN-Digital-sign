@@ -93,6 +93,8 @@ export const Verify = () => {
     WebViewer(
       {
         path: '/webviewer/lib',
+        licenseKey:
+          'demo:1738134661579:7e96ae3803000000002af4ccc4d7039aebd9699379b2679c5a49147ffc',
         fullAPI: true,
       },
       viewer.current
@@ -127,7 +129,7 @@ export const Verify = () => {
 
       // Add trust root to store of trusted certificates contained in VerificationOptions.
       await opts.addTrustedCertificateFromURL(
-        `http://localhost:5173/api/auth/get-key/${user?.id}/public_key`
+        `http://localhost:5173/api/auth/get-key/${userVerify}/public_key`
       );
 
       const result = await doc.verifySignedDigitalSignatures(opts);
@@ -135,14 +137,14 @@ export const Verify = () => {
       setStep(3);
       switch (result) {
         case PDFNet.PDFDoc.SignaturesVerificationStatus.e_unsigned:
-          setMessage('Tài liệu không có trường chữ ký đã ký.');
+          setMessage('Tài liệu không có chữ ký.');
           return false;
 
         case PDFNet.PDFDoc.SignaturesVerificationStatus.e_failure:
           setMessage('Lỗi nghiêm trọng khi xác minh ít nhất một chữ ký.');
           return false;
         case PDFNet.PDFDoc.SignaturesVerificationStatus.e_untrusted:
-          setMessage('Không thể xác minh độ tin cậy của ít nhất một chữ ký.');
+          setMessage('Chữ ký không phải của người dùng này.');
           return false;
         case PDFNet.PDFDoc.SignaturesVerificationStatus.e_unsupported:
           setMessage(
@@ -158,6 +160,7 @@ export const Verify = () => {
   };
 
   const handleBack = () => {
+    setIsVerified(false);
     setStep(1);
   };
 

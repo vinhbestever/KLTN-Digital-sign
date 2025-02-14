@@ -340,7 +340,7 @@ router.post('/refresh-token', (req, res) => {
 });
 
 // API lấy khoá của người dùng
-router.get('/get-key/:userId/:fileType', authenticate, async (req, res) => {
+router.get('/get-key/:userId/:fileType', async (req, res) => {
   try {
     const { userId, fileType } = req.params;
 

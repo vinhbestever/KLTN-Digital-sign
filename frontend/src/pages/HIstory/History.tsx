@@ -188,6 +188,16 @@ export const History = () => {
       key: 'file_name',
     },
     {
+      title: 'ID người dùng đã ký',
+      dataIndex: 'id',
+      key: 'id',
+    },
+    {
+      title: 'Tên người đã ký',
+      dataIndex: 'user_name',
+      key: 'user_name',
+    },
+    {
       title: 'Ngày Đã Ký',
       dataIndex: 'signed_at',
       key: 'signed_at',

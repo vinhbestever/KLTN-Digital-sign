@@ -36,6 +36,8 @@ export const Sign = () => {
     WebViewer(
       {
         path: '/webviewer/lib',
+        licenseKey:
+          'demo:1738134661579:7e96ae3803000000002af4ccc4d7039aebd9699379b2679c5a49147ffc',
         fullAPI: true,
       },
       viewer.current
