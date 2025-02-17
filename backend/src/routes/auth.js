@@ -104,7 +104,9 @@ router.post('/register', async (req, res) => {
     const pfxPath = path.join(tempDir, 'certificate.pfx');
     const pfxPassword = 'key-password';
 
-    execSync(`openssl genpkey -algorithm RSA -out ${privateKeyPath}`);
+    execSync(
+      `openssl genpkey -algorithm RSA -out ${privateKeyPath} -pkeyopt rsa_keygen_bits:4096`
+    );
     execSync(
       `openssl req -new -key ${privateKeyPath} -out ${csrPath} -subj "/CN=${email}"`
     );
