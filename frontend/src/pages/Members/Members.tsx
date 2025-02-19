@@ -19,6 +19,10 @@ import { PlusOutlined, UserOutlined } from '@ant-design/icons';
 const { Search } = Input;
 const { Option } = Select;
 
+const checkCertificateStatus = (certExpiresAt: string) => {
+  return dayjs(certExpiresAt).isBefore(dayjs()) ? 'Hết hạn' : 'Còn hạn';
+};
+
 export const Members = () => {
   const [data, setData] = useState([]);
   const [total, setTotal] = useState(0);
@@ -29,8 +33,11 @@ export const Members = () => {
 
   const [form] = Form.useForm();
   const [form2] = Form.useForm();
+  const [form3] = Form.useForm();
   const [isModalVisible, setIsModalVisible] = useState(false);
   const [isModalCreateVisible, setIsModalCreateVisible] = useState(false);
+  const [isModalRenew, setIsModalRenew] = useState(false);
+
   const [currentUser, setCurrentUser] = useState(null);
 
   useEffect(() => {
@@ -62,13 +69,27 @@ export const Members = () => {
   };
 
   const handleDelete = async (id) => {
-    try {
-      await axiosInstance.delete(`api/user/users/${id}`);
-      message.success('Xóa user thành công!');
-      fetchUsers();
-    } catch (error) {
-      message.error('Lỗi khi xóa user!');
-    }
+    Modal.warning({
+      title: 'Có chắc muốn xoá tài khoản này',
+      async onOk() {
+        try {
+          await axiosInstance.delete(`api/user/users/${id}`);
+          message.success('Xóa user thành công!');
+          fetchUsers();
+        } catch (error) {
+          message.error('Lỗi khi xóa user!');
+        }
+      },
+    });
+  };
+
+  const handleRenew = (record) => {
+    setCurrentUser(record);
+    form3.setFieldsValue({
+      ...record,
+      dob: record.dob ? dayjs(record.dob) : null, // 🔹 Chuyển đổi từ string sang dayjs
+    });
+    setIsModalRenew(true);
   };
 
   const handleSubmit = async (values) => {
@@ -89,6 +110,20 @@ export const Members = () => {
       message.success('Tạo tài khoản thành công!');
       fetchUsers();
       setIsModalCreateVisible(false);
+      form.resetFields();
+    } catch (error) {
+      message.error('Lỗi tạo tài khoản!');
+    }
+  };
+
+  const handleSubmitRenew = async (values) => {
+    try {
+      await axiosInstance.post(
+        `api/auth/renew-cert/${currentUser.id}/${values.type}`
+      );
+      message.success('Tạo tài khoản thành công!');
+      fetchUsers();
+      setIsModalRenew(false);
       form.resetFields();
     } catch (error) {
       message.error('Lỗi tạo tài khoản!');
@@ -116,32 +151,6 @@ export const Members = () => {
       key: 'email',
     },
     {
-      title: 'Số Điện Thoại',
-      dataIndex: 'phone',
-      key: 'phone',
-    },
-    {
-      title: 'Địa Chỉ',
-      dataIndex: 'address',
-      key: 'address',
-    },
-    {
-      title: 'Giới Tính',
-      dataIndex: 'gender',
-      key: 'gender',
-      filters: [
-        { text: 'Nam', value: 'Male' },
-        { text: 'Nữ', value: 'Female' },
-      ],
-      onFilter: (value: string, record: any) => record.gender === value,
-    },
-    {
-      title: 'Ngày Sinh',
-      dataIndex: 'dob',
-      key: 'dob',
-      render: (dob: string) => new Date(dob).toLocaleDateString(),
-    },
-    {
       title: 'Loại Tài Khoản',
       dataIndex: 'role',
       key: 'role',
@@ -160,6 +169,41 @@ export const Members = () => {
         <Tag color={is_verified ? 'green' : 'red'}>
           {is_verified ? 'Đã Xác Thực' : 'Chưa Xác Thực'}
         </Tag>
+      ),
+    },
+    {
+      title: 'Loại Chứng Chỉ',
+      dataIndex: 'algorithm',
+      key: 'algorithm',
+      render: (type: string) =>
+        type === 'RSA' ? 'RSA (4096-bit)' : 'ECC (256-bit)',
+    },
+    {
+      title: 'Ngày hết hạn chứng chỉ',
+      dataIndex: 'cert_expires_at',
+      key: 'cert_expires_at',
+      render: (date: string) => dayjs(date).format('DD/MM/YYYY HH:mm:ss'),
+    },
+    {
+      title: 'Trạng thái chứng chỉ',
+      dataIndex: 'cert_expires_at',
+      key: 'cert_status',
+      render: (date: string) => {
+        const status = checkCertificateStatus(date);
+        return (
+          <span style={{ color: status === 'Hết hạn' ? 'red' : 'green' }}>
+            {status}
+          </span>
+        );
+      },
+    },
+    {
+      title: 'Cấp chứng chỉ',
+      key: 'action',
+      render: (record) => (
+        <Button type="primary" onClick={() => handleRenew(record)}>
+          Cấp lại
+        </Button>
       ),
     },
     {
@@ -220,6 +264,32 @@ export const Members = () => {
         </div>
       </div>
       <Modal
+        open={isModalRenew}
+        title="Cấp mới chứng chỉ số"
+        onCancel={() => setIsModalRenew(false)}
+        footer={
+          <div className="flex items-center w-full justify-end gap-[12px]">
+            <Button onClick={() => setIsModalRenew(false)}>Huỷ</Button>
+            <Button type="primary" onClick={() => form3.submit()}>
+              Lưu
+            </Button>
+          </div>
+        }
+      >
+        <Form form={form3} layout="vertical" onFinish={handleSubmitRenew}>
+          <Form.Item
+            name="type"
+            label="Loại hệ mật"
+            rules={[{ required: true }]}
+          >
+            <Select>
+              <Option value="ECC">ECC (256-bit)</Option>
+              <Option value="RSA">RSA (4096-bit)</Option>
+            </Select>
+          </Form.Item>
+        </Form>
+      </Modal>
+      <Modal
         open={isModalCreateVisible}
         title="Chỉnh sửa Thông tin tài khoản"
         onCancel={() => setIsModalCreateVisible(false)}
@@ -254,6 +324,16 @@ export const Members = () => {
             <Select>
               <Option value="admin">Quản Lý</Option>
               <Option value="user">Người Dùng</Option>
+            </Select>
+          </Form.Item>
+          <Form.Item
+            name="algorithm"
+            label="Loại hệ mật"
+            rules={[{ required: true }]}
+          >
+            <Select>
+              <Option value="ECC">ECC (256-bit)</Option>
+              <Option value="RSA">RSA (4096-bit)</Option>
             </Select>
           </Form.Item>
         </Form>

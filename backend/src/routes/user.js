@@ -12,7 +12,7 @@ router.get('/user', authenticate, async (req, res) => {
   try {
     const userId = req.user.id;
     const userQuery = await pool.query(
-      'SELECT id, name, avatar, email, phone, address, gender, dob, role FROM users WHERE id = $1',
+      'SELECT id, name, avatar, email, phone, address, gender, dob, role, cert_expires_at, algorithm FROM users WHERE id = $1',
       [userId]
     );
 
@@ -36,6 +36,8 @@ router.get('/user', authenticate, async (req, res) => {
       gender: user.gender,
       dob: user.dob,
       role: user.role,
+      cert_expires_at: user.cert_expires_at,
+      algorithm: user.algorithm,
     });
   } catch (error) {
     console.error('Lỗi khi lấy thông tin user:', error);
@@ -121,7 +123,7 @@ router.get('/users', authenticate, async (req, res) => {
     const offset = (page - 1) * pageSize;
 
     let query = `
-      SELECT id, avatar, name, email, phone, address, gender, dob, role, is_verified 
+      SELECT id, avatar, name, email, phone, address, gender, dob, role, is_verified, cert_expires_at, algorithm
       FROM users 
       WHERE name ILIKE $1`;
 

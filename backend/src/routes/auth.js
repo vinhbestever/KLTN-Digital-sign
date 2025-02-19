@@ -39,20 +39,43 @@ const transporter = nodemailer.createTransport({
   },
 });
 
-// Hàm sinh ID
-const generateNextUserId = async () => {
-  const result = await pool.query(
-    "SELECT MAX(id) AS max_id FROM users WHERE id LIKE 'A%'"
-  );
+// Hàm tạo chứng chỉ RSA hoặc ECC
+const generateCertificate = (email, algorithm) => {
+  const tempDir = path.join(__dirname, '../temp');
+  if (!fs.existsSync(tempDir)) fs.mkdirSync(tempDir);
 
-  let nextNumber = 1;
-  if (result.rows[0].max_id) {
-    const lastId = result.rows[0].max_id;
-    const lastNumber = parseInt(lastId.slice(1), 10);
-    nextNumber = lastNumber + 1;
+  const privateKeyPath = path.join(tempDir, 'private-key.pem');
+  const csrPath = path.join(tempDir, 'csr.pem');
+  const certificatePath = path.join(tempDir, 'certificate.pem');
+  const pfxPath = path.join(tempDir, 'certificate.pfx');
+  const pfxPassword = 'key-password';
+
+  if (algorithm === 'RSA') {
+    execSync(
+      `openssl genpkey -algorithm RSA -pkeyopt rsa_keygen_bits:4096 -out ${privateKeyPath}`
+    );
+  } else {
+    execSync(
+      `openssl ecparam -name prime256v1 -genkey -noout -out ${privateKeyPath}`
+    );
   }
 
-  return `A${String(nextNumber).padStart(5, '0')}`;
+  execSync(
+    `openssl req -new -key ${privateKeyPath} -out ${csrPath} -subj "/CN=${email}"`
+  );
+  execSync(
+    `openssl x509 -req -days 7 -in ${csrPath} -signkey ${privateKeyPath} -out ${certificatePath}`
+  );
+  execSync(
+    `openssl pkcs12 -export -out ${pfxPath} -inkey ${privateKeyPath} -in ${certificatePath} -passout pass:${pfxPassword}`
+  );
+
+  const publicKey = fs.readFileSync(certificatePath, 'utf8');
+  const privateKey = fs.readFileSync(pfxPath);
+  const expirationDate = new Date();
+  expirationDate.setDate(expirationDate.getDate() + 7);
+
+  return { publicKey, privateKey, expirationDate };
 };
 
 // API Đăng ký
@@ -102,23 +125,11 @@ router.post('/register', async (req, res) => {
     const csrPath = path.join(tempDir, 'csr.pem');
     const certificatePath = path.join(tempDir, 'certificate.pem');
     const pfxPath = path.join(tempDir, 'certificate.pfx');
-    const pfxPassword = 'key-password';
 
-    execSync(
-      `openssl genpkey -algorithm RSA -out ${privateKeyPath} -pkeyopt rsa_keygen_bits:4096`
+    const { publicKey, privateKey, expirationDate } = generateCertificate(
+      email,
+      'ECC'
     );
-    execSync(
-      `openssl req -new -key ${privateKeyPath} -out ${csrPath} -subj "/CN=${email}"`
-    );
-    execSync(
-      `openssl x509 -req -days 365 -in ${csrPath} -signkey ${privateKeyPath} -out ${certificatePath}`
-    );
-    execSync(
-      `openssl pkcs12 -export -out ${pfxPath} -inkey ${privateKeyPath} -in ${certificatePath} -passout pass:${pfxPassword}`
-    );
-
-    const publicKey = fs.readFileSync(certificatePath, 'utf8');
-    const privateKey = fs.readFileSync(pfxPath);
 
     const passwordHash = await bcrypt.hash(password, 10);
 
@@ -126,8 +137,17 @@ router.post('/register', async (req, res) => {
     const otpExpiration = new Date(Date.now() + 5 * 60 * 1000);
 
     await pool.query(
-      'INSERT INTO users (email, name, password_hash, otp_code, otp_expiration, public_key, private_key) VALUES ($1, $2, $3, $4, $5, $6, $7)',
-      [email, name, passwordHash, otpCode, otpExpiration, publicKey, privateKey]
+      'INSERT INTO users (email, name, password_hash, otp_code, otp_expiration, public_key, private_key, cert_expires_at) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)',
+      [
+        email,
+        name,
+        passwordHash,
+        otpCode,
+        otpExpiration,
+        publicKey,
+        privateKey,
+        expirationDate,
+      ]
     );
 
     await transporter.sendMail({
@@ -151,7 +171,7 @@ router.post('/register', async (req, res) => {
 
 // API tạo tài khoản
 router.post('/create-account', authenticate, async (req, res) => {
-  const { email, password, name, role } = req.body;
+  const { email, password, name, role, algorithm } = req.body;
 
   try {
     const userQuery = await pool.query('SELECT * FROM users WHERE email = $1', [
@@ -168,21 +188,11 @@ router.post('/create-account', authenticate, async (req, res) => {
     const csrPath = path.join(tempDir, 'csr.pem');
     const certificatePath = path.join(tempDir, 'certificate.pem');
     const pfxPath = path.join(tempDir, 'certificate.pfx');
-    const pfxPassword = 'key-password';
 
-    execSync(`openssl genpkey -algorithm RSA -out ${privateKeyPath}`);
-    execSync(
-      `openssl req -new -key ${privateKeyPath} -out ${csrPath} -subj "/CN=${email}"`
+    const { publicKey, privateKey, expirationDate } = generateCertificate(
+      email,
+      algorithm
     );
-    execSync(
-      `openssl x509 -req -days 365 -in ${csrPath} -signkey ${privateKeyPath} -out ${certificatePath}`
-    );
-    execSync(
-      `openssl pkcs12 -export -out ${pfxPath} -inkey ${privateKeyPath} -in ${certificatePath} -passout pass:${pfxPassword}`
-    );
-
-    const publicKey = fs.readFileSync(certificatePath, 'utf8');
-    const privateKey = fs.readFileSync(pfxPath);
 
     const passwordHash = await bcrypt.hash(password, 10);
 
@@ -190,7 +200,7 @@ router.post('/create-account', authenticate, async (req, res) => {
     const otpExpiration = null;
 
     await pool.query(
-      'INSERT INTO users (email, name, password_hash, otp_code, otp_expiration, public_key, private_key, is_verified, role) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)',
+      'INSERT INTO users (email, name, password_hash, otp_code, otp_expiration, public_key, private_key, is_verified, role, cert_expires_at, algorithm) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)',
       [
         email,
         name,
@@ -201,6 +211,8 @@ router.post('/create-account', authenticate, async (req, res) => {
         privateKey,
         true,
         role,
+        expirationDate,
+        algorithm,
       ]
     );
 
@@ -419,4 +431,49 @@ router.post('/resend-otp', async (req, res) => {
     res.status(500).json({ error: 'Lỗi khi gửi lại OTP!' });
   }
 });
+
+// API Admin duyệt yêu cầu cấp lại chứng chỉ
+router.post('/renew-cert/:userId/:type', authenticate, async (req, res) => {
+  try {
+    const { userId, type } = req.params;
+    const user = await pool.query(
+      'SELECT email, algorithm FROM users WHERE id = $1',
+      [userId]
+    );
+
+    if (user.rows.length === 0) {
+      return res.status(404).json({ error: 'User không tồn tại' });
+    }
+
+    const tempDir = path.join(__dirname, '../temp');
+    if (!fs.existsSync(tempDir)) fs.mkdirSync(tempDir);
+
+    const privateKeyPath = path.join(tempDir, 'private-key.pem');
+    const csrPath = path.join(tempDir, 'csr.pem');
+    const certificatePath = path.join(tempDir, 'certificate.pem');
+    const pfxPath = path.join(tempDir, 'certificate.pfx');
+
+    const { email } = user.rows[0];
+    const { publicKey, privateKey, expirationDate } = generateCertificate(
+      email,
+      type
+    );
+
+    await pool.query(
+      'UPDATE users SET public_key = $1, private_key = $2, cert_expires_at = $3, algorithm = $4 WHERE id = $5',
+      [publicKey, privateKey, expirationDate, type, userId]
+    );
+
+    fs.unlinkSync(privateKeyPath);
+    fs.unlinkSync(csrPath);
+    fs.unlinkSync(certificatePath);
+    fs.unlinkSync(pfxPath);
+
+    res.json({ message: 'Cấp chứng chỉ mới thành công' });
+  } catch (error) {
+    console.error('Lỗi khi cấp lại chứng chỉ:', error);
+    res.status(500).json({ error: 'Lỗi khi cấp lại chứng chỉ' });
+  }
+});
+
 module.exports = router;

@@ -118,15 +118,6 @@ export const Profile = () => {
           <div className="flex flex-col gap-[24px]">
             <div className="flex gap-[10xp]">
               <div className="text-[16px] text-start w-[120px] text-gray-500">
-                Mã
-              </div>
-              <div className="text-[16px] text-start font-semibold">
-                {user?.id}
-              </div>
-            </div>
-
-            <div className="flex gap-[10xp]">
-              <div className="text-[16px] text-start w-[120px] text-gray-500">
                 Email
               </div>
               <div className="text-[16px] text-start font-semibold">
@@ -149,6 +140,24 @@ export const Profile = () => {
               </div>
               <div className="text-[16px] text-start font-semibold">
                 {user?.role === 'user' ? 'Người dùng' : 'Quản lý'}
+              </div>
+            </div>
+
+            <div className="flex gap-[10xp]">
+              <div className="text-[16px] text-start w-[120px] text-gray-500">
+                Loại chứng chỉ
+              </div>
+              <div className="text-[16px] text-start font-semibold">
+                {user?.algorithm === 'RSA' ? 'RSA (4096-bit)' : 'ECC (256-bit)'}
+              </div>
+            </div>
+
+            <div className="flex gap-[10xp]">
+              <div className="text-[16px] text-start w-[120px] text-gray-500">
+                Ngày hết hạn chứng chỉ
+              </div>
+              <div className="text-[16px] text-start font-semibold">
+                {dayjs(user?.cert_expires_at).format('DD/MM/YYYY HH:mm:ss')}
               </div>
             </div>
           </div>

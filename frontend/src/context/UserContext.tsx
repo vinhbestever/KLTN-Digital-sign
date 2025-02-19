@@ -18,6 +18,8 @@ export interface User {
   gender: string;
   dob: string;
   role: string;
+  cert_expires_at: string;
+  algorithm: string;
 }
 
 interface UserContextType {
