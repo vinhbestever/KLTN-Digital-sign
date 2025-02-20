@@ -291,7 +291,7 @@ export const Members = () => {
       </Modal>
       <Modal
         open={isModalCreateVisible}
-        title="Chỉnh sửa Thông tin tài khoản"
+        title="Tạo mới tài khoản"
         onCancel={() => setIsModalCreateVisible(false)}
         footer={
           <div className="flex items-center w-full justify-end gap-[12px]">

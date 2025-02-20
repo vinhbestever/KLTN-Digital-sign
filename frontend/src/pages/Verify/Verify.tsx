@@ -152,7 +152,7 @@ export const Verify = () => {
           );
           return false;
         case PDFNet.PDFDoc.SignaturesVerificationStatus.e_verified:
-          setMessage('Chữ ký hợp lệ!!!');
+          setMessage('Chữ ký hợp lệ với chứng chỉ của Người dùng này!!!');
           setIsVerified(true);
           return true;
       }
