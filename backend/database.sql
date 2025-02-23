@@ -77,6 +77,8 @@ CREATE TABLE public.users (
     gender character varying(10),
     dob date,
     role character varying(10) DEFAULT 'user'::character varying,
+    algorithm character varying(10) DEFAULT 'ECC'::character varying NOT NULL,
+    cert_expires_at timestamp without time zone DEFAULT (now() + '7 days'::interval),
     CONSTRAINT users_role_check CHECK (((role)::text = ANY ((ARRAY['user'::character varying, 'admin'::character varying])::text[])))
 );
 

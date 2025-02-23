@@ -1,5 +1,6 @@
 import {
   CheckCircleOutlined,
+  CloseCircleFilled,
   CloudUploadOutlined,
   ContainerFilled,
   SignatureFilled,
@@ -10,6 +11,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import WebViewer from '@pdftron/webviewer';
 import axiosInstance from '../../api/axiosConfig';
 import { useUser } from '../../context/UserContext';
+import dayjs from 'dayjs';
 
 export const Sign = () => {
   const [uploadedFiles, setUploadedFiles] = useState(null);
@@ -192,6 +194,9 @@ export const Sign = () => {
     a.click();
     document.body.removeChild(a);
   };
+
+  console.log('user', user);
+
   return (
     <div className="p-[32px] flex flex-col w-full h-full gap-[18px]">
       <div className="text-[22px] font-medium">Chọn tài liệu ký</div>
@@ -230,7 +235,7 @@ export const Sign = () => {
               />
             </div>
 
-            {step === 1 && (
+            {step === 1 && !dayjs(user?.cert_expires_at).isBefore(dayjs()) && (
               <label
                 onClick={() => {
                   if (filePicker) {
@@ -257,6 +262,17 @@ export const Sign = () => {
                   </p>
                 </div>
               </label>
+            )}
+
+            {dayjs(user?.cert_expires_at).isBefore(dayjs()) && (
+              <div className="w-full h-full flex flex-col items-center gap-[32px] p-32">
+                <CloseCircleFilled
+                  style={{ fontSize: '100px', color: 'red' }}
+                />
+                <div className="text-[24px]">
+                  Chứng chỉ của bạn đã hết hạn!! Không thể thực hiện ký
+                </div>
+              </div>
             )}
 
             {step === 3 && (
